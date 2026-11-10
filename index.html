@@ -3,137 +3,252 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17212b">
 <title>Калькулятор навеса 3D</title>
 <style>
-  :root{--bg:#f4f5f7;--panel:#fff;--ink:#1d2330;--muted:#6b7385;--line:#e3e6ec;--acc:#2f6fed;}
+  @font-face{font-family:"Golos Text";font-weight:400 900;font-display:swap;src:url(lib/golos-cyr.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+  @font-face{font-family:"Golos Text";font-weight:400 900;font-display:swap;src:url(lib/golos-lat.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  :root{
+    --paper:#e9edf1; --panel:#fbfcfd; --ink:#17212b; --mute:#5b6876; --rule:#cfd6de; --field:#fff;
+    --tape:#f5b800; --tape-soft:#fff3c4; --steel:#3c4a59; --alert:#8a4b00;
+  }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
-  #app{display:grid;grid-template-columns:350px 1fr;height:100vh}
-  #side{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 16px 40px}
-  h1{font-size:18px;margin:2px 0 12px}
-  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px;border-top:1px solid var(--line);padding-top:12px}
-  .row{display:grid;grid-template-columns:1fr 130px;align-items:center;gap:8px;margin:6px 0}
-  .row label{color:#38404f}
+  html,body{margin:0;height:100%}
+  body{font:14px/1.45 "Golos Text",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--paper);-webkit-text-size-adjust:100%}
+  button,input,select{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+  #app{display:grid;grid-template-columns:372px minmax(0,1fr);height:100vh}
+
+  /* ---- панель настроек ---- */
+  #side{background:var(--panel);border-right:1.5px solid var(--ink);overflow:auto;padding:18px 18px 40px}
+  .head h1{font-size:21px;line-height:1.15;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
+  .head p{margin:0 0 14px;color:var(--mute);font-size:13px}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+  .chip{border:1px solid var(--rule);background:var(--field);border-radius:4px;padding:5px 9px;font-size:12.5px;cursor:pointer}
+  .chip:hover{border-color:var(--ink)}
+  details{border-top:1px solid var(--rule);padding:2px 0}
+  details:first-of-type{margin-top:12px}
+  summary{list-style:none;cursor:pointer;font-weight:700;font-size:14.5px;padding:11px 0 9px;display:flex;justify-content:space-between;align-items:center}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg);margin-right:4px;transition:transform .15s}
+  details:not([open]) summary::after{transform:rotate(-45deg)}
+  details > .body{padding-bottom:10px}
+  .row{display:grid;grid-template-columns:minmax(0,1fr) 148px;align-items:center;gap:10px;margin:7px 0}
+  .row > label{font-size:13.5px;color:var(--steel)}
   .row.hidden{display:none}
-  input[type=number],select{width:100%;padding:5px 7px;border:1px solid #cfd4dd;border-radius:6px;font:inherit;background:#fff}
-  .chk{display:flex;gap:8px;align-items:center;margin:6px 0}
-  .swatches{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}
-  .sw{width:26px;height:26px;border-radius:6px;border:2px solid #fff;outline:1px solid #cfd4dd;cursor:pointer}
-  .sw.on{outline:2px solid var(--acc)}
-  #main{position:relative;display:flex;flex-direction:column;min-width:0}
-  #main{height:100vh}
-  #view{flex:1 1 0;min-height:300px;position:relative;overflow:hidden}
-  #view canvas{display:block;position:absolute;inset:0}
-  #toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2}
-  button{border:1px solid #cfd4dd;background:#fff;border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
-  button:hover{border-color:var(--acc);color:var(--acc)}
-  #summary{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;padding:8px 12px;z-index:2;font-size:13px}
-  #summary b{font-size:15px}
-  #specWrap{height:38%;min-height:160px;overflow:auto;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px}
-  table{border-collapse:collapse;width:100%;font-size:13px}
-  th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
-  th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}
-  td.n,th.n{text-align:right}
-  tr.tot td{font-weight:700}
-  .warn{color:#b45309;font-size:12px;margin-top:6px}
-  @media (max-width:800px){
+  select,.num{width:100%;height:34px;border:1px solid var(--rule);border-radius:4px;background:var(--field)}
+  select{padding:0 8px}
+  select:hover,.num:hover{border-color:var(--steel)}
+  .num{display:grid;grid-template-columns:32px 1fr 32px;overflow:hidden}
+  .num:focus-within{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .num input{border:0;background:transparent;text-align:center;width:100%;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;-moz-appearance:textfield;outline:0}
+  .num input::-webkit-outer-spin-button,.num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .num button{border:0;background:transparent;font-size:18px;line-height:1;cursor:pointer;color:var(--steel);touch-action:manipulation}
+  .num button:hover{background:var(--tape-soft);color:var(--ink)}
+  .num button:active{background:var(--tape)}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:4px 0 10px}
+  .seg button{border:1px solid var(--rule);background:var(--field);border-radius:4px;padding:8px 4px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12.5px}
+  .seg button svg{width:54px;height:26px;stroke:var(--steel);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .seg button:hover{border-color:var(--steel)}
+  .seg button[aria-pressed=true]{background:var(--tape);border-color:var(--ink);font-weight:700}
+  .seg button[aria-pressed=true] svg{stroke:var(--ink)}
+  .chk{display:flex;gap:9px;align-items:flex-start;margin:8px 0;font-size:13.5px;color:var(--steel);cursor:pointer}
+  .chk input{width:17px;height:17px;margin:1px 0 0;accent-color:var(--ink);flex:none}
+  .colorrow{margin:10px 0 4px}
+  .colorrow .cap{display:flex;justify-content:space-between;font-size:13.5px;color:var(--steel);margin-bottom:6px}
+  .colorrow .cap b{color:var(--ink);font-weight:600}
+  .swatches{display:flex;flex-wrap:wrap;gap:7px}
+  .sw{width:30px;height:30px;border-radius:4px;border:1px solid rgba(23,33,43,.25);cursor:pointer;padding:0}
+  .sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+  .ghost{border:1px solid var(--rule);background:var(--field);border-radius:4px;padding:7px 12px;cursor:pointer}
+  .ghost:hover{border-color:var(--ink)}
+
+  /* ---- 3D и таблица ---- */
+  #main{display:flex;flex-direction:column;min-width:0;height:100vh}
+  #view{flex:1 1 0;min-height:300px;position:relative;overflow:hidden;background:#dfe8f1}
+  #view canvas{display:block;position:absolute;inset:0;outline:0}
+  #toolbar{position:absolute;top:12px;left:12px;display:flex;gap:6px;z-index:2}
+  .tb{border:1px solid var(--ink);background:var(--panel);border-radius:4px;padding:6px 11px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
+  .tb:hover{background:var(--tape)}
+  .tb.group{border-radius:0;margin-left:-7px}
+  .tb.first{border-radius:4px 0 0 4px}
+  .tb.last{border-radius:0 4px 4px 0;margin-right:6px}
+  .tb[aria-pressed=true]{background:var(--ink);color:#fff}
+  #hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--steel);background:rgba(251,252,253,.8);padding:3px 8px;border-radius:4px;z-index:2;pointer-events:none}
+  /* штамп чертежа */
+  #stamp{position:absolute;right:12px;bottom:12px;z-index:2;background:var(--panel);border:1.5px solid var(--ink);display:grid;grid-template-columns:repeat(3,auto);font-variant-numeric:tabular-nums;pointer-events:none}
+  #stamp .big{grid-column:1/-1;padding:7px 12px 6px;border-bottom:1.5px solid var(--ink);font-size:17px;font-weight:800;letter-spacing:-.01em;background:var(--tape)}
+  #stamp .cell{padding:5px 12px 6px;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+  #stamp .cell:nth-child(3n+1){border-right:0}
+  #stamp .cell:nth-last-child(-n+3){border-bottom:0}
+  #stamp .cell span{display:block;font-size:11px;color:var(--mute);line-height:1.2}
+  #stamp .cell b{font-size:14px;font-weight:700}
+
+  #specWrap{height:38%;min-height:170px;overflow:auto;background:var(--panel);border-top:1.5px solid var(--ink)}
+  .spechead{display:flex;align-items:center;gap:8px;padding:10px 18px;position:sticky;top:0;left:0;background:var(--panel);z-index:1;border-bottom:1px solid var(--rule)}
+  .spechead h2{font-size:15px;font-weight:800;margin:0 auto 0 0}
+  #notes{margin:10px 18px 0;padding:8px 12px;background:var(--tape-soft);border-left:4px solid var(--tape);font-size:13px;color:var(--alert)}
+  #notes:empty{display:none}
+  #notes div+div{margin-top:4px}
+  table{border-collapse:collapse;width:calc(100% - 36px);margin:4px 18px 24px;font-size:13px;font-variant-numeric:tabular-nums}
+  th,td{padding:6px 10px 6px 0;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap}
+  th{color:var(--mute);font-weight:500;font-size:12px}
+  tr.grp th{color:var(--ink);font-weight:700;font-size:13px;padding-top:16px;border-bottom:1.5px solid var(--ink)}
+  td.n,th.n{text-align:right;padding-right:0;padding-left:10px}
+  tr.tot td{font-weight:800;border-bottom:0;background:linear-gradient(var(--tape-soft),var(--tape-soft))}
+  tr.tot td:first-child{padding-left:8px;box-shadow:inset 4px 0 0 var(--tape)}
+  tr.tot td:last-child{padding-right:8px}
+
+  @media (max-width:820px){
     html,body{height:auto;overflow-x:clip}
     #app{display:flex;flex-direction:column;height:auto}
     #main{display:contents}
-    #view{order:1;position:sticky;top:0;z-index:5;height:44vh;height:44dvh;min-height:240px;flex:none;border-bottom:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.08)}
-    #side{order:2;border-right:0;overflow:visible;padding:12px 14px 20px}
-    #specWrap{order:3;height:auto;min-height:0;overflow-x:auto;padding:10px 14px 30px}
-    h1{font-size:16px}
-    input[type=number],select{font-size:16px;padding:7px 8px} /* без автозума на iPhone */
-    .row{grid-template-columns:1fr 150px}
-    .sw{width:32px;height:32px}
-    #toolbar{top:6px;left:6px;right:6px;flex-wrap:nowrap;overflow-x:auto;gap:4px;scrollbar-width:none}
+    #view{order:1;position:sticky;top:0;z-index:5;height:46vh;height:46dvh;min-height:250px;flex:none;border-bottom:1.5px solid var(--ink)}
+    #side{order:2;border-right:0;overflow:visible;padding:14px 14px 10px}
+    #specWrap{order:3;height:auto;min-height:0;overflow-x:auto}
+    .head h1{font-size:18px}
+    .row{grid-template-columns:minmax(0,1fr) 156px}
+    select,.num{height:40px}
+    .num{grid-template-columns:40px 1fr 40px}
+    .num input,select{font-size:16px} /* без автозума на iPhone */
+    .sw{width:36px;height:36px}
+    #toolbar{top:8px;left:8px;right:8px;overflow-x:auto;scrollbar-width:none}
     #toolbar::-webkit-scrollbar{display:none}
-    #toolbar button{padding:5px 9px;font-size:13px;flex:none}
-    #print{display:none}
-    #summary{top:auto;bottom:6px;right:6px;padding:4px 8px;font-size:11px;line-height:1.3}
-    #summary b{font-size:12px}
-    table{font-size:12px}
-    th,td{padding:4px 6px}
-    td:first-child{white-space:normal;min-width:120px}
+    .tb{padding:6px 10px;flex:none}
+    #hint,#print{display:none}
+    #stamp{left:0;right:0;bottom:0;border-width:1.5px 0 0;grid-template-columns:repeat(6,1fr)}
+    #stamp .big{display:none}
+    #stamp .cell{padding:3px 6px 4px;border-bottom:0!important;border-right:1px solid var(--rule)!important}
+    #stamp .cell span{font-size:10px}
+    #stamp .cell b{font-size:12px}
+    .spechead{padding:10px 14px}
+    #notes{margin:10px 14px 0}
+    table{width:calc(100% - 28px);margin:4px 14px 30px;font-size:12.5px}
+    td:first-child{white-space:normal;min-width:104px}
+    td:nth-child(2),tr.grp th{white-space:normal}
+    th,td{padding-right:6px}
+    td.n,th.n{padding-left:4px}
   }
-  @media print{#side,#toolbar{display:none}#app{display:block}#view{height:50vh}#specWrap{height:auto;overflow:visible}}
+  @media print{
+    #side,#toolbar,#hint,.spechead button{display:none!important}
+    #app,#main{display:block;height:auto}
+    #view{height:52vh;position:relative}
+    #specWrap{height:auto;overflow:visible;border-top:0}
+  }
+  @media (prefers-reduced-motion:reduce){summary::after{transition:none}}
 </style>
 </head>
 <body>
 <div id="app">
   <aside id="side">
-    <h1>Калькулятор навеса из профильной трубы</h1>
+    <div class="head">
+      <h1>Навес из профильной трубы</h1>
+      <p>Задайте размеры и получите 3D-модель со списком материалов.</p>
+      <div class="presets" id="presets"></div>
+    </div>
 
-    <h2>Размеры</h2>
-    <div class="row"><label>Ширина (вынос), м</label><input type="number" id="width" min="2" max="12" step="0.1"></div>
-    <div class="row"><label>Длина, м</label><input type="number" id="length" min="2" max="30" step="0.1"></div>
-    <div class="row"><label>Высота до низа фермы, м</label><input type="number" id="height" min="1.8" max="5" step="0.05"></div>
-    <div class="row"><label>Высота подъёма крыши, м</label><input type="number" id="rise" min="0.2" max="3" step="0.05"></div>
+    <details open>
+      <summary>Размеры</summary>
+      <div class="body">
+        <div class="row"><label for="width">Ширина, м</label><input type="number" inputmode="decimal" id="width" min="2" max="12" step="0.1"></div>
+        <div class="row"><label for="length">Длина, м</label><input type="number" inputmode="decimal" id="length" min="2" max="30" step="0.1"></div>
+        <div class="row"><label for="height">Высота до низа фермы, м</label><input type="number" inputmode="decimal" id="height" min="1.8" max="5" step="0.05"></div>
+        <div class="row"><label for="rise">Подъём крыши, м</label><input type="number" inputmode="decimal" id="rise" min="0.2" max="3" step="0.05"></div>
+      </div>
+    </details>
 
-    <h2>Крыша и фермы</h2>
-    <div class="row"><label>Тип крыши</label>
-      <select id="roofType">
-        <option value="single">Односкатная</option>
-        <option value="gable">Двускатная</option>
-        <option value="arch">Арочная</option>
-      </select></div>
-    <div class="row" id="rowFarmDepth"><label>Высота арочной фермы, м</label><input type="number" id="farmDepth" min="0.1" max="0.6" step="0.01"></div>
-    <div class="row"><label>Шаг ферм, м</label><input type="number" id="farmStep" min="0.5" max="2" step="0.05"></div>
-    <div class="row"><label>Шаг обрешётки, м</label><input type="number" id="lathStep" min="0.3" max="1.2" step="0.05"></div>
-    <div class="row"><label>Свес по скату, м</label><input type="number" id="ovx" min="0" max="0.8" step="0.05"></div>
-    <div class="row"><label>Свес по торцам, м</label><input type="number" id="ovz" min="0" max="0.6" step="0.05"></div>
+    <details open>
+      <summary>Крыша и фермы</summary>
+      <div class="body">
+        <div class="seg" id="roofTypeSeg" role="group" aria-label="Тип крыши">
+          <button type="button" data-val="single"><svg viewBox="0 0 54 26"><path d="M5 20 L49 6 M9 20 V24 M45 8 V24 M9 20 H45"/></svg>Односкатная</button>
+          <button type="button" data-val="gable"><svg viewBox="0 0 54 26"><path d="M5 18 L27 5 L49 18 M9 17 V24 M45 17 V24 M9 17 H45"/></svg>Двускатная</button>
+          <button type="button" data-val="arch"><svg viewBox="0 0 54 26"><path d="M5 18 Q27 -4 49 18 M9 15 V24 M45 15 V24"/></svg>Арочная</button>
+        </div>
+        <div class="row" id="rowFarmDepth"><label for="farmDepth">Высота арочной фермы, м</label><input type="number" inputmode="decimal" id="farmDepth" min="0.1" max="0.6" step="0.01"></div>
+        <div class="row"><label for="farmStep">Шаг ферм, м</label><input type="number" inputmode="decimal" id="farmStep" min="0.5" max="2" step="0.05"></div>
+        <div class="row"><label for="lathStep">Шаг обрешётки, м</label><input type="number" inputmode="decimal" id="lathStep" min="0.3" max="1.2" step="0.05"></div>
+        <div class="row"><label for="ovx">Свес по скату, м</label><input type="number" inputmode="decimal" id="ovx" min="0" max="0.8" step="0.05"></div>
+        <div class="row"><label for="ovz">Свес по торцам, м</label><input type="number" inputmode="decimal" id="ovz" min="0" max="0.6" step="0.05"></div>
+      </div>
+    </details>
 
-    <h2>Столбы и установка</h2>
-    <div class="row"><label>Шаг столбов, м</label><input type="number" id="pillarStep" min="1" max="4" step="0.1"></div>
-    <div class="row"><label>Установка</label>
-      <select id="install">
-        <option value="base">На бетонное основание (анкеры)</option>
-        <option value="concrete">Бетонирование столбов</option>
-      </select></div>
-    <div class="row" id="rowDepth"><label>Глубина бетонирования, м</label><input type="number" id="concreteDepth" min="0.5" max="1.8" step="0.05"></div>
-    <label class="chk" id="rowWall"><input type="checkbox" id="wall"> Пристенный (высокая сторона крепится к стене)</label>
+    <details open>
+      <summary>Столбы и установка</summary>
+      <div class="body">
+        <div class="row"><label for="pillarStep">Шаг столбов, м</label><input type="number" inputmode="decimal" id="pillarStep" min="1" max="4" step="0.1"></div>
+        <div class="row"><label for="install">Установка</label>
+          <select id="install">
+            <option value="base">На бетонную плиту</option>
+            <option value="concrete">Бетонирование в грунт</option>
+          </select></div>
+        <div class="row" id="rowDepth"><label for="concreteDepth">Глубина бетонирования, м</label><input type="number" inputmode="decimal" id="concreteDepth" min="0.5" max="1.8" step="0.05"></div>
+        <label class="chk" id="rowWall"><input type="checkbox" id="wall"> Пристенный навес: высокая сторона крепится к стене дома</label>
+      </div>
+    </details>
 
-    <h2>Профильная труба, мм</h2>
-    <div class="row"><label>Столбы</label><select id="pillarSec" class="pipe"></select></div>
-    <div class="row"><label>Продольные балки</label><select id="beamSec" class="pipe"></select></div>
-    <div class="row"><label>Пояса ферм</label><select id="chordSec" class="pipe"></select></div>
-    <div class="row"><label>Раскосы ферм</label><select id="webSec" class="pipe"></select></div>
-    <div class="row"><label>Обрешётка</label><select id="lathSec" class="pipe"></select></div>
+    <details open>
+      <summary>Кровля и цвет</summary>
+      <div class="body">
+        <div class="row"><label for="roofMat">Материал</label>
+          <select id="roofMat">
+            <option value="pc10">Сотовый поликарбонат 10 мм</option>
+            <option value="pc8">Сотовый поликарбонат 8 мм</option>
+            <option value="mono">Монолитный поликарбонат 4 мм</option>
+            <option value="prof">Профнастил С-20</option>
+            <option value="tile">Металлочерепица</option>
+          </select></div>
+        <div class="colorrow"><div class="cap">Цвет кровли <b id="roofColorName"></b></div><div class="swatches" id="roofColors"></div></div>
+        <div class="colorrow"><div class="cap">Цвет каркаса <b id="frameColorName"></b></div><div class="swatches" id="frameColors"></div></div>
+      </div>
+    </details>
 
-    <h2>Кровля и цвет</h2>
-    <div class="row"><label>Материал кровли</label>
-      <select id="roofMat">
-        <option value="pc10">Сотовый поликарбонат 10 мм</option>
-        <option value="pc8">Сотовый поликарбонат 8 мм</option>
-        <option value="mono">Монолитный поликарбонат 4 мм</option>
-        <option value="prof">Профнастил С-20</option>
-        <option value="tile">Металлочерепица</option>
-      </select></div>
-    <div class="row"><label>Цвет кровли</label><span id="roofColorName"></span><div class="swatches" id="roofColors"></div></div>
-    <div class="row"><label>Цвет каркаса</label><span id="frameColorName"></span><div class="swatches" id="frameColors"></div></div>
-    <div id="warn" class="warn"></div>
+    <details>
+      <summary>Сечения труб, мм</summary>
+      <div class="body">
+        <div class="row"><label for="pillarSec">Столбы</label><select id="pillarSec" class="pipe"></select></div>
+        <div class="row"><label for="beamSec">Продольные балки</label><select id="beamSec" class="pipe"></select></div>
+        <div class="row"><label for="chordSec">Пояса ферм</label><select id="chordSec" class="pipe"></select></div>
+        <div class="row"><label for="webSec">Раскосы ферм</label><select id="webSec" class="pipe"></select></div>
+        <div class="row"><label for="lathSec">Обрешётка</label><select id="lathSec" class="pipe"></select></div>
+      </div>
+    </details>
 
-    <h2>Отображение</h2>
-    <label class="chk"><input type="checkbox" id="showRoof" checked> Показывать кровлю</label>
-    <label class="chk"><input type="checkbox" id="showDims" checked> Показывать размеры</label>
-    <label class="chk"><input type="checkbox" id="showPerson" checked> Человек для масштаба</label>
-    <p style="margin-top:16px"><button id="reset">Сбросить параметры</button></p>
+    <details>
+      <summary>Что показывать</summary>
+      <div class="body">
+        <label class="chk"><input type="checkbox" id="showRoof" checked> Кровля</label>
+        <label class="chk"><input type="checkbox" id="showDims" checked> Размеры</label>
+        <label class="chk"><input type="checkbox" id="showCar" checked> Автомобиль</label>
+        <label class="chk"><input type="checkbox" id="showPerson" checked> Человек для масштаба</label>
+      </div>
+    </details>
+    <p style="margin:16px 0 0"><button class="ghost" id="reset" type="button">Сбросить настройки</button></p>
   </aside>
 
   <section id="main">
     <div id="view">
       <div id="toolbar">
-        <button data-view="iso">3D</button>
-        <button data-view="front">Спереди</button>
-        <button data-view="side">Сбоку</button>
-        <button data-view="top">Сверху</button>
-        <button id="shot">Скачать картинку</button>
-        <button id="print">Печать</button>
+        <button class="tb group first" data-view="iso" type="button">3D</button>
+        <button class="tb group" data-view="front" type="button">Спереди</button>
+        <button class="tb group" data-view="side" type="button">Сбоку</button>
+        <button class="tb group last" data-view="top" type="button">Сверху</button>
+        <button class="tb" id="shot" type="button">Сохранить картинку</button>
       </div>
-      <div id="summary"></div>
+      <div id="hint">Вращение: левая кнопка мыши. Масштаб: колесо. Сдвиг: правая кнопка.</div>
+      <div id="stamp"></div>
     </div>
-    <div id="specWrap"><table id="spec"></table></div>
+    <div id="specWrap">
+      <div class="spechead">
+        <h2>Материалы</h2>
+        <button class="ghost" id="copyLink" type="button">Скопировать ссылку</button>
+        <button class="ghost" id="csv" type="button">Скачать таблицу</button>
+        <button class="ghost" id="print" type="button">Печать</button>
+      </div>
+      <div id="notes"></div>
+      <table id="spec"></table>
+    </div>
   </section>
 </div>
 
@@ -148,13 +263,19 @@ const DEFAULTS = {
   width:4.5, length:6, height:2.5, rise:0.8, roofType:'single', farmDepth:0.25,
   farmStep:1.0, lathStep:0.6, ovx:0.2, ovz:0.15, pillarStep:2.5, install:'base', concreteDepth:1.0, wall:false,
   pillarSec:'80x80x3', beamSec:'80x40x2', chordSec:'40x40x2', webSec:'40x20x1.5', lathSec:'40x20x1.5',
-  roofMat:'pc10', roofColor:'Прозрачный', frameColor:'Чёрный RAL 9005'
+  roofMat:'pc10', roofColor:'Бронза', frameColor:'Чёрный RAL 9005'
 };
+const PRESETS = [
+  ['Одна машина 3,5 × 6', {width:3.5,length:6}],
+  ['Две машины 6 × 6', {width:6,length:6,chordSec:'60x40x2'}],
+  ['Терраса 3 × 4', {width:3,length:4,height:2.3,rise:0.5,pillarSec:'60x60x2',pillarStep:2}],
+  ['Арка 5 × 8', {width:5,length:8,roofType:'arch',rise:1}]
+];
 const PC_COLORS = {'Прозрачный':['#cfe6ff',.45],'Бронза':['#8c6b3f',.6],'Янтарь':['#e8a33c',.6],'Синий':['#3a7bd5',.55],
   'Зелёный':['#3fa34d',.55],'Бирюза':['#2bb3b1',.55],'Красный':['#c0392b',.6],'Молочный':['#f2f1ea',.85]};
-const MONO_COLORS = {'Прозрачный':['#e6f3ff',.25],'Бронза':['#8c6b3f',.5],'Серый':['#8a8f96',.5]};
-const RAL = {'Чёрный RAL 9005':'#1f1f20','Коричневый RAL 8017':'#45322e','Графит RAL 7024':'#474a51','Белый RAL 9003':'#ececec',
-  'Зелёный RAL 6005':'#114232','Вишня RAL 3005':'#5e2129','Синий RAL 5005':'#1e3f7a','Серый (грунт)':'#8a8d8f'};
+const MONO_COLORS = {'Прозрачный':['#e6f3ff',.3],'Бронза':['#8c6b3f',.5],'Серый':['#8a8f96',.5]};
+const RAL = {'Чёрный RAL 9005':'#232325','Коричневый RAL 8017':'#45322e','Графит RAL 7024':'#474a51','Белый RAL 9003':'#ececec',
+  'Зелёный RAL 6005':'#114232','Вишня RAL 3005':'#5e2129','Синий RAL 5005':'#1e3f7a','Серый грунт':'#8a8d8f'};
 const ROOF_INFO = {
   pc10:{name:'Сотовый поликарбонат 10 мм', colors:PC_COLORS, sheetW:2.1, sheetL:[6,12], kgm2:1.1},
   pc8:{name:'Сотовый поликарбонат 8 мм', colors:PC_COLORS, sheetW:2.1, sheetL:[6,12], kgm2:0.9},
@@ -162,109 +283,187 @@ const ROOF_INFO = {
   prof:{name:'Профнастил С-20', colors:RAL, sheetW:1.10, sheetL:null, kgm2:4.4, opaque:true},
   tile:{name:'Металлочерепица', colors:RAL, sheetW:1.10, sheetL:null, kgm2:4.6, opaque:true}
 };
+const ROOF_TYPES = ['single','gable','arch'];
 const STEEL = 7850;
 function sec(s){const [a,b,t]=s.split('x').map(Number);return {a:a/1000,b:b/1000,t:t/1000,
   kgm:(a*b-(a-2*t)*(b-2*t))*1e-6*STEEL, perim:2*(a+b)/1000};}
+const secName = s => s.replace(/x/g,' × ').replace('.',',');
+
+const $ = id => document.getElementById(id);
+const NUMS = ['width','length','height','rise','farmDepth','farmStep','lathStep','ovx','ovz','pillarStep','concreteDepth'];
+const SELS = ['install','pillarSec','beamSec','chordSec','webSec','lathSec','roofMat'];
+document.querySelectorAll('select.pipe').forEach(s=>{
+  PIPES.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=secName(p);s.appendChild(o);});
+});
 
 // ---------- состояние ----------
 let P = load();
 function load(){
-  let p = Object.assign({}, DEFAULTS);
+  const p = Object.assign({}, DEFAULTS);
   try{ Object.assign(p, JSON.parse(localStorage.getItem('navesCalc')||'{}')); }catch(e){}
-  try{ if(location.hash.length>1) Object.assign(p, JSON.parse(decodeURIComponent(location.hash.slice(1)))); }catch(e){}
+  try{
+    const h = decodeURIComponent(location.hash.slice(1));
+    if(h.startsWith('{')) Object.assign(p, JSON.parse(h));       // старый формат ссылок
+    else if(h) new URLSearchParams(h).forEach((v,k)=>{ if(k in DEFAULTS) p[k] = typeof DEFAULTS[k]==='number' ? parseFloat(v) : typeof DEFAULTS[k]==='boolean' ? v==='1' : v; });
+  }catch(e){}
+  return sanitize(p);
+}
+// любые значения из ссылки или памяти приводим к допустимым
+function sanitize(p){
+  NUMS.forEach(f=>{ const el=$(f); let v=parseFloat(p[f]); if(!isFinite(v)) v=DEFAULTS[f]; p[f]=Math.min(+el.max,Math.max(+el.min,v)); });
+  SELS.forEach(f=>{ if(![...$(f).options].some(o=>o.value===p[f])) p[f]=DEFAULTS[f]; });
+  if(!ROOF_TYPES.includes(p.roofType)) p.roofType=DEFAULTS.roofType;
+  p.wall=!!p.wall;
+  if(!(p.roofColor in ROOF_INFO[p.roofMat].colors)) p.roofColor=Object.keys(ROOF_INFO[p.roofMat].colors)[0];
+  if(!(p.frameColor in RAL)) p.frameColor=DEFAULTS.frameColor;
+  Object.keys(p).forEach(k=>{ if(!(k in DEFAULTS)) delete p[k]; });
   return p;
 }
-function save(){ try{ localStorage.setItem('navesCalc', JSON.stringify(P)); }catch(e){} }
+function save(){
+  try{ localStorage.setItem('navesCalc', JSON.stringify(P)); }catch(e){}
+  const q=new URLSearchParams();
+  Object.keys(DEFAULTS).forEach(k=>{ if(P[k]!==DEFAULTS[k]) q.set(k, typeof P[k]==='boolean' ? (P[k]?'1':'0') : P[k]); });
+  const s=q.toString();
+  try{ history.replaceState(null,'', s ? '#'+s : location.pathname+location.search); }catch(e){}
+}
 
 // ---------- UI ----------
-const $ = id => document.getElementById(id);
-document.querySelectorAll('select.pipe').forEach(s=>{
-  PIPES.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p.replace(/x/g,' × ');s.appendChild(o);});
+// поля чисел с кнопками − и +
+NUMS.forEach(f=>{
+  const inp=$(f), w=document.createElement('div'); w.className='num';
+  inp.parentNode.insertBefore(w,inp);
+  const mk=(t,d)=>{
+    const b=document.createElement('button'); b.type='button'; b.textContent=t; b.tabIndex=-1;
+    b.setAttribute('aria-label',(d>0?'Увеличить: ':'Уменьшить: ')+inp.labels[0].textContent);
+    b.addEventListener('click',()=>{
+      const st=+inp.step; let v=Math.round((P[f]+d*st)/st)*st;
+      setNum(f, v); inp.value=P[f];
+    });
+    return b;
+  };
+  w.append(mk('−',-1), inp, mk('+',1));
+  inp.addEventListener('input',()=>{ const v=parseFloat(String(inp.value).replace(',','.')); if(isFinite(v)) setNum(f,v); });
+  inp.addEventListener('change',()=>{ inp.value=P[f]; });
 });
-const fields = ['width','length','height','rise','roofType','farmDepth','farmStep','lathStep','ovx','ovz','pillarStep',
-  'install','concreteDepth','pillarSec','beamSec','chordSec','webSec','lathSec','roofMat'];
+function setNum(f,v){
+  const el=$(f); v=Math.min(+el.max,Math.max(+el.min,v)); v=+v.toFixed(3);
+  if(v===P[f]) return; P[f]=v; changed();
+}
+SELS.forEach(f=>$(f).addEventListener('change',()=>{ P[f]=$(f).value; changed(true); }));
+document.querySelectorAll('#roofTypeSeg button').forEach(b=>b.addEventListener('click',()=>{ P.roofType=b.dataset.val; changed(true); }));
+$('wall').addEventListener('change',()=>{P.wall=$('wall').checked;changed();});
+['showRoof','showDims','showCar','showPerson'].forEach(id=>$(id).addEventListener('change',()=>schedule()));
+$('reset').addEventListener('click',()=>{ P=sanitize(Object.assign({},DEFAULTS)); changed(true); refit=true; });
+PRESETS.forEach(([name,vals])=>{
+  const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=name;
+  b.addEventListener('click',()=>{ P=sanitize(Object.assign({},DEFAULTS,{frameColor:P.frameColor},vals)); changed(true); refit=true; });
+  $('presets').appendChild(b);
+});
+
 function syncUI(){
-  fields.forEach(f=>{ $(f).value = P[f]; });
-  $('wall').checked = !!P.wall;
-  buildSwatches();
+  NUMS.forEach(f=>{ if(document.activeElement!==$(f)) $(f).value=P[f]; });
+  SELS.forEach(f=>{ $(f).value=P[f]; });
+  $('wall').checked=P.wall;
+  document.querySelectorAll('#roofTypeSeg button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.val===P.roofType));
   $('rowFarmDepth').classList.toggle('hidden', P.roofType!=='arch');
   $('rowDepth').classList.toggle('hidden', P.install!=='concrete');
   $('rowWall').style.display = P.roofType==='single' ? 'flex' : 'none';
+  buildSwatches();
 }
 function buildSwatches(){
-  const info = ROOF_INFO[P.roofMat];
-  if(!(P.roofColor in info.colors)) P.roofColor = Object.keys(info.colors)[0];
-  if(!(P.frameColor in RAL)) P.frameColor = DEFAULTS.frameColor;
+  const info=ROOF_INFO[P.roofMat];
+  if(!(P.roofColor in info.colors)) P.roofColor=Object.keys(info.colors)[0];
   fillSw($('roofColors'), info.colors, P.roofColor, k=>{P.roofColor=k;changed();});
   fillSw($('frameColors'), RAL, P.frameColor, k=>{P.frameColor=k;changed();});
-  $('roofColorName').textContent = P.roofColor;
-  $('frameColorName').textContent = P.frameColor;
+  $('roofColorName').textContent=P.roofColor;
+  $('frameColorName').textContent=P.frameColor;
 }
-function fillSw(el, map, cur, cb){
-  el.innerHTML='';
+function fillSw(el,map,cur,cb){
+  el.textContent='';
   Object.keys(map).forEach(k=>{
-    const d=document.createElement('div'); d.className='sw'+(k===cur?' on':''); d.title=k;
-    const v=map[k]; d.style.background = Array.isArray(v)?v[0]:v;
-    d.onclick=()=>cb(k); el.appendChild(d);
+    const b=document.createElement('button'); b.type='button'; b.className='sw'; b.title=k; b.setAttribute('aria-label',k);
+    b.setAttribute('aria-pressed', k===cur);
+    const v=map[k]; b.style.background=Array.isArray(v)?v[0]:v;
+    b.addEventListener('click',()=>cb(k)); el.appendChild(b);
   });
 }
-fields.forEach(f=>{
-  $(f).addEventListener('input', ()=>{
-    const el=$(f); let v = el.type==='number' ? parseFloat(el.value) : el.value;
-    if(el.type==='number'){ if(isNaN(v)) return; v=Math.min(+el.max,Math.max(+el.min,v)); }
-    P[f]=v; changed(f==='roofMat'||f==='roofType'||f==='install');
-  });
-  if($(f).type==='number') $(f).addEventListener('change', ()=>{ $(f).value=P[f]; });
-});
-$('wall').addEventListener('change',()=>{P.wall=$('wall').checked;changed();});
-['showRoof','showDims','showPerson'].forEach(id=>$(id).addEventListener('change',()=>changed()));
-$('reset').onclick=()=>{P=Object.assign({},DEFAULTS);history.replaceState(null,'',location.pathname);syncUI();changed();fitView('iso');};
-
 let pending=false;
+function schedule(){ if(!pending){pending=true;requestAnimationFrame(()=>{pending=false;rebuild();});} }
 function changed(resync){
   if(resync) syncUI(); else buildSwatches();
-  save();
-  history.replaceState(null,'','#'+encodeURIComponent(JSON.stringify(P)));
-  if(!pending){pending=true;requestAnimationFrame(()=>{pending=false;rebuild();});}
+  save(); schedule();
 }
 
 // ---------- three.js сцена ----------
-const view = $('view');
-const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputEncoding = THREE.sRGBEncoding;
-view.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('#dfe8f1');
-scene.fog = new THREE.Fog('#dfe8f1', 40, 120);
-const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI*0.495;
+const view=$('view');
+const isTouch=matchMedia('(pointer:coarse)').matches;
+const renderer=new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouch?1.5:2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+view.insertBefore(renderer.domElement, view.firstChild);
+const scene=new THREE.Scene();
+const HORIZON='#e6edf3';
+(function sky(){
+  const c=document.createElement('canvas'); c.width=4; c.height=256;
+  const g=c.getContext('2d'), gr=g.createLinearGradient(0,0,0,256);
+  gr.addColorStop(0,'#9fc3e6'); gr.addColorStop(.55,'#d3e3f1'); gr.addColorStop(1,HORIZON);
+  g.fillStyle=gr; g.fillRect(0,0,4,256);
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; scene.background=t;
+})();
+scene.fog=new THREE.Fog(HORIZON, 45, 130);
+const camera=new THREE.PerspectiveCamera(38, 1, 0.1, 500);
 
-scene.add(new THREE.HemisphereLight('#ffffff','#8c9a7a',0.75));
-const sun = new THREE.DirectionalLight('#ffffff',0.85);
-sun.position.set(12,20,16); sun.castShadow=true;
-sun.shadow.mapSize.set(2048,2048);
-Object.assign(sun.shadow.camera,{left:-25,right:25,top:25,bottom:-25,near:1,far:80});
-scene.add(sun);
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(300,300), new THREE.MeshStandardMaterial({color:'#9fb08a',roughness:1}));
+let controls;
+function makeControls(){
+  const t=controls ? controls.target.clone() : null;
+  if(controls) controls.dispose();
+  controls=new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping=true;
+  controls.maxPolarAngle=Math.PI*0.495;
+  controls.minDistance=2; controls.maxDistance=110;
+  if(t){ controls.target.copy(t); controls.update(); }
+}
+makeControls();
+// Защита от «залипших» касаний: если телефон потерял отпускание пальца,
+// OrbitControls считает следующее касание вторым пальцем и перестаёт вращать модель.
+const activeTouches=new Set();
+view.addEventListener('pointerdown', e=>{
+  if(e.pointerType!=='mouse' && e.isPrimary && activeTouches.size>0){ activeTouches.clear(); makeControls(); }
+  activeTouches.add(e.pointerId);
+}, true);
+['pointerup','pointercancel','lostpointercapture'].forEach(ev=>window.addEventListener(ev, e=>activeTouches.delete(e.pointerId), true));
+function dropTouches(){ if(activeTouches.size){ activeTouches.clear(); makeControls(); } }
+window.addEventListener('blur', dropTouches);
+window.addEventListener('pagehide', dropTouches);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) dropTouches(); });
+// Потеря WebGL-контекста (нехватка памяти на телефоне): восстановиться и перерисовать
+renderer.domElement.addEventListener('webglcontextlost', e=>e.preventDefault());
+renderer.domElement.addEventListener('webglcontextrestored', ()=>{ matCache={}; schedule(); });
+
+scene.add(new THREE.HemisphereLight('#ffffff','#7f8f70',0.5));
+const sun=new THREE.DirectionalLight('#fff4e0',0.75);
+sun.castShadow=true;
+sun.shadow.mapSize.set(isTouch?1024:2048, isTouch?1024:2048);
+sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.02;
+scene.add(sun); scene.add(sun.target);
+const ground=new THREE.Mesh(new THREE.CircleGeometry(160,48), new THREE.MeshStandardMaterial({color:'#7f9a68',roughness:1}));
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
-let model = new THREE.Group(); scene.add(model);
+let model=new THREE.Group(); scene.add(model);
+const unitBox=new THREE.BoxGeometry(1,1,1); unitBox.userData.shared=true;
 
 function resize(){
   const w=view.clientWidth, h=view.clientHeight;
   if(!w||!h) return;
-  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); sizeLabels();
 }
 window.addEventListener('resize', resize);
 
 // ---------- построение ----------
-const X = new THREE.Vector3(1,0,0);
-let spec, matCache={};
+const X=new THREE.Vector3(1,0,0);
+let spec, members, matCache={};
 function mat(color, opts){
   const k=color+JSON.stringify(opts||{});
   if(!matCache[k]) matCache[k]=new THREE.MeshStandardMaterial(Object.assign({color, roughness:.55, metalness:.25}, opts||{}));
@@ -275,42 +474,64 @@ function addSpec(role, s, len){
   spec[k].len+=len; spec[k].n+=1;
 }
 // стержень из профтрубы между точками; сторона a — «вверх», b — поперёк
-function member(p1, p2, s, color, role, specLen){
-  const S=sec(s), d=new THREE.Vector3().subVectors(p2,p1), len=d.length();
+function member(p1, p2, s, role, specLen){
+  const S=sec(s), len=p1.distanceTo(p2);
   if(len<1e-4) return;
-  const m=new THREE.Mesh(new THREE.BoxGeometry(len, S.a, S.b), mat(color));
-  m.position.copy(p1).add(p2).multiplyScalar(.5);
-  m.quaternion.setFromUnitVectors(X, d.normalize());
-  m.castShadow=true; m.receiveShadow=true; model.add(m);
-  if(role) addSpec(role, s, specLen!==undefined?specLen:len);
+  members.push([p1,p2,S.a,S.b]);
+  if(role) addSpec(role, s, specLen!==undefined?Math.max(0,specLen):len);
+}
+function flushMembers(color){
+  if(!members.length) return;
+  const inst=new THREE.InstancedMesh(unitBox, mat(color), members.length);
+  const m4=new THREE.Matrix4(), q=new THREE.Quaternion(), d=new THREE.Vector3(), pos=new THREE.Vector3(), sc=new THREE.Vector3();
+  members.forEach(([p1,p2,a,b],i)=>{
+    d.subVectors(p2,p1); const len=d.length();
+    q.setFromUnitVectors(X, d.normalize());
+    pos.addVectors(p1,p2).multiplyScalar(.5); sc.set(len,a,b);
+    inst.setMatrixAt(i, m4.compose(pos,q,sc));
+  });
+  inst.castShadow=true; inst.receiveShadow=true; inst.frustumCulled=false;
+  model.add(inst);
+}
+function box(w,h,d,x,y,z,material,shadow){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), material);
+  m.position.set(x,y,z); m.receiveShadow=true; m.castShadow=!!shadow; model.add(m); return m;
 }
 const v3=(x,y,z)=>new THREE.Vector3(x,y,z);
 const linspace=(a,b,n)=>Array.from({length:n},(_,i)=>n===1?a:a+(b-a)*i/(n-1));
 
 function trussProfile(){
-  const W=P.width, S=P.rise, ch=sec(P.chordSec), yb=P.height+ch.a/2;
+  const W=P.width, ch=sec(P.chordSec), yb=P.height+ch.a/2;
+  const S = P.roofType==='arch' ? Math.min(P.rise, W*0.45) : P.rise;
   const h0=Math.min(0.15,S*0.5);
   let N=Math.max(4,Math.round(W/0.6)); if(N%2) N++;
   const xs=linspace(0,W,N+1);
-  let top, bot;
+  let top, bot, angle=null, radius=null;
   if(P.roofType==='single'){
-    top=x=>yb+h0+(S-h0)*x/W; bot=()=>yb;
+    top=x=>yb+h0+(S-h0)*x/W; bot=()=>yb; angle=Math.atan((S-h0)/W);
   }else if(P.roofType==='gable'){
-    top=x=>yb+h0+(S-h0)*(1-Math.abs(2*x/W-1)); bot=()=>yb;
+    top=x=>yb+h0+(S-h0)*(1-Math.abs(2*x/W-1)); bot=()=>yb; angle=Math.atan((S-h0)/(W/2));
   }else{
-    const R=(W*W/4+S*S)/(2*S), cy=S-R;
+    const R=(W*W/4+S*S)/(2*S), cy=S-R; radius=R;
     const f=x=>cy+Math.sqrt(Math.max(0,R*R-(x-W/2)**2));
     top=x=>yb+P.farmDepth+f(x); bot=x=>yb+f(x);
   }
-  const fine = P.roofType==='arch' ? linspace(0,W,Math.max(24,N*3)+1) : (P.roofType==='gable'?[0,W/2,W]:[0,W]);
-  return {xs, N, top, bot, fine, yb};
+  const fine = P.roofType==='arch' ? linspace(0,W,Math.max(24,N*2)+1) : (P.roofType==='gable'?[0,W/2,W]:[0,W]);
+  return {xs, N, top, bot, fine, yb, angle, radius, clamped:S<P.rise};
 }
 
+let refit=true, lastR=null;
 function rebuild(){
   scene.remove(model);
-  model.traverse(o=>{ if(o.geometry) o.geometry.dispose(); });
+  // освобождаем память видеокарты: геометрию и все материалы/текстуры, кроме общих
+  const cached=new Set(Object.values(matCache));
+  model.traverse(o=>{
+    if(o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
+    if(o.material && !cached.has(o.material)){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    if(o.isInstancedMesh) o.dispose();
+  });
   model=new THREE.Group(); scene.add(model);
-  spec={};
+  spec={}; members=[]; labels=[];
   const W=P.width, L=P.length, H=P.height;
   const frameC=RAL[P.frameColor];
   const bm=sec(P.beamSec), ch=sec(P.chordSec), lt=sec(P.lathSec);
@@ -320,68 +541,63 @@ function rebuild(){
   const nP=Math.max(2, Math.ceil(L/P.pillarStep-1e-9)+1);
   const zs=linspace(0,L,nP);
   const sides = wall ? [0] : [0,W];
-  const pillarTop = H - bm.a;
+  const pillarTop=H-bm.a;
   const below = P.install==='concrete' ? P.concreteDepth : 0;
+  const concreteM=mat('#c9c7c1',{metalness:0,roughness:.95});
   sides.forEach(x=>zs.forEach(z=>{
-    member(v3(x,0,z), v3(x,pillarTop,z), P.pillarSec, frameC, 'Столбы', pillarTop+below);
-    if(P.install==='base'){
-      const pl=new THREE.Mesh(new THREE.BoxGeometry(.2,.01,.2), mat('#555'));
-      pl.position.set(x,.005,z); model.add(pl);
-    }else{
-      const c=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.03,20), mat('#b9b9b4',{metalness:0}));
-      c.position.set(x,.015,z); c.receiveShadow=true; model.add(c);
+    member(v3(x,0,z), v3(x,pillarTop,z), P.pillarSec, 'Столбы', pillarTop+below);
+    if(P.install==='base') box(.2,.012,.2, x,.086,z, mat('#4a4d52'));
+    else{
+      const c=new THREE.Mesh(new THREE.CylinderGeometry(.17,.17,.04,20), concreteM);
+      c.position.set(x,.02,z); c.receiveShadow=true; model.add(c);
     }
   }));
   if(P.install==='base'){
-    const sw = W + (wall?0.3:0.6);
-    const slab=new THREE.Mesh(new THREE.BoxGeometry(sw,.08,L+.6), mat('#c4c2bc',{metalness:0,roughness:.95}));
-    slab.position.set(wall?(W-0.3)/2:W/2,-.035,L/2); slab.receiveShadow=true; model.add(slab);
+    box(W+(wall?0.4:0.8), .08, L+.8, wall?(W-0.4)/2:W/2, .04, L/2, concreteM);
+  }else{
+    box(W+(wall?0.4:0.8), .02, L+.8, wall?(W-0.4)/2:W/2, .01, L/2, mat('#b9b2a2',{metalness:0,roughness:1}));
   }
+  const floorY = P.install==='base' ? .08 : .02;
   // продольные балки
-  [0,W].forEach(x=>member(v3(x,H-bm.a/2,0), v3(x,H-bm.a/2,L), P.beamSec, frameC, wall&&x===W?'Пристенная балка':'Продольные балки'));
+  [0,W].forEach(x=>member(v3(x,H-bm.a/2,0), v3(x,H-bm.a/2,L), P.beamSec, wall&&x===W?'Пристенная балка':'Продольные балки'));
   if(wall){
-    const wh=H+P.rise+1.2;
-    const wm=new THREE.Mesh(new THREE.BoxGeometry(.4, wh, L+3), mat('#d9cfc0',{metalness:0,roughness:.9}));
-    wm.position.set(W+bm.b/2+.2,wh/2,L/2); wm.receiveShadow=true; wm.castShadow=true; model.add(wm);
+    const wh=H+P.rise+1.3;
+    box(.4, wh, L+3, W+bm.b/2+.2, wh/2, L/2, mat('#ddd2c2',{metalness:0,roughness:.9}), true);
   }
 
   // фермы
   const T=trussProfile();
   const nF=Math.max(2, Math.ceil(L/P.farmStep-1e-9)+1);
-  const fz=linspace(0,L,nF);
-  fz.forEach(z=>{
+  linspace(0,L,nF).forEach(z=>{
     for(let i=0;i<T.fine.length-1;i++){
       const a=T.fine[i], b=T.fine[i+1];
-      member(v3(a,T.top(a),z), v3(b,T.top(b),z), P.chordSec, frameC, 'Верхний пояс ферм');
-      member(v3(a,T.bot(a),z), v3(b,T.bot(b),z), P.chordSec, frameC, 'Нижний пояс ферм');
+      member(v3(a,T.top(a),z), v3(b,T.top(b),z), P.chordSec, 'Верхний пояс ферм');
+      member(v3(a,T.bot(a),z), v3(b,T.bot(b),z), P.chordSec, 'Нижний пояс ферм');
     }
     const half=T.N/2;
     for(let i=0;i<=T.N;i++){
       const x=T.xs[i], h=T.top(x)-T.bot(x);
-      if(h>ch.a*1.2) member(v3(x,T.bot(x)+ch.a/2,z), v3(x,T.top(x)-ch.a/2,z), P.webSec, frameC, 'Раскосы и стойки');
+      if(h>ch.a*1.2) member(v3(x,T.bot(x)+ch.a/2,z), v3(x,T.top(x)-ch.a/2,z), P.webSec, 'Раскосы и стойки');
       if(i<T.N){
         const x2=T.xs[i+1];
-        let p,q;
         const forward = P.roofType==='single' ? true : i<half;
-        if(forward){ p=v3(x,T.bot(x),z); q=v3(x2,T.top(x2),z); }
-        else { p=v3(x,T.top(x),z); q=v3(x2,T.bot(x2),z); }
-        member(p,q,P.webSec,frameC,'Раскосы и стойки',p.distanceTo(q)-ch.a);
+        const p = forward ? v3(x,T.bot(x),z) : v3(x,T.top(x),z);
+        const q = forward ? v3(x2,T.top(x2),z) : v3(x2,T.bot(x2),z);
+        member(p,q,P.webSec,'Раскосы и стойки',p.distanceTo(q)-ch.a);
       }
     }
   });
 
-  // профиль кровли (с вылетом по скату), смещённый по нормали
+  // профиль кровли (со свесом по скату), смещённый по нормали
   const base=T.fine.map(x=>[x,T.top(x)]);
-  function ext(pA,pB,len){const dx=pA[0]-pB[0],dy=pA[1]-pB[1],l=Math.hypot(dx,dy);return [pA[0]+dx/l*len,pA[1]+dy/l*len];}
-  const prof=[ext(base[0],base[1],P.ovx), ...base, ext(base[base.length-1],base[base.length-2],P.ovx)];
-  if(wall) prof.pop(); // у стены свеса нет
-  function offsetProfile(pts,off){
-    return pts.map((p,i)=>{
-      const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
-      let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
-      return [p[0]-ty*off, p[1]+tx*off];
-    });
-  }
+  const ext=(pA,pB,len)=>{const dx=pA[0]-pB[0],dy=pA[1]-pB[1],l=Math.hypot(dx,dy);return [pA[0]+dx/l*len,pA[1]+dy/l*len];};
+  const prof=[...base];
+  if(P.ovx>0.001){ prof.unshift(ext(base[0],base[1],P.ovx)); if(!wall) prof.push(ext(base[base.length-1],base[base.length-2],P.ovx)); }
+  const offsetProfile=(pts,off)=>pts.map((p,i)=>{
+    const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
+    let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
+    return [p[0]-ty*off, p[1]+tx*off];
+  });
   // обрешётка
   const lathPts=[]; {
     let acc=0, next=0; const step=P.lathStep;
@@ -396,165 +612,242 @@ function rebuild(){
   lathPts.forEach(([x,y,i])=>{
     const a=base[i], b=base[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
     const off=ch.a/2+lt.a/2, px=x-ty*off, py=y+tx*off;
-    member(v3(px,py,-P.ovz), v3(px,py,L+P.ovz), P.lathSec, frameC, 'Обрешётка');
+    member(v3(px,py,-P.ovz), v3(px,py,L+P.ovz), P.lathSec, 'Обрешётка');
   });
+  flushMembers(frameC);
+
   // кровля
   const rp=offsetProfile(prof, ch.a/2+lt.a+0.006);
   let dev=0; for(let i=0;i<rp.length-1;i++) dev+=Math.hypot(rp[i+1][0]-rp[i][0],rp[i+1][1]-rp[i][1]);
   const info=ROOF_INFO[P.roofMat], cval=info.colors[P.roofColor];
   const roofColor=Array.isArray(cval)?cval[0]:cval, opacity=Array.isArray(cval)?cval[1]:1;
   const z0=-P.ovz, z1=L+P.ovz;
-  const pos=[], idx=[];
-  rp.forEach(([x,y])=>{pos.push(x,y,z0, x,y,z1);});
-  for(let i=0;i<rp.length-1;i++){const k=i*2; idx.push(k,k+1,k+2, k+1,k+3,k+2);}
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
-  const roofMesh=new THREE.Mesh(g, info.opaque
+  if($('showRoof').checked){
+    const pos=[], idx=[];
+    rp.forEach(([x,y])=>{pos.push(x,y,z0, x,y,z1);});
+    for(let i=0;i<rp.length-1;i++){const k=i*2; idx.push(k,k+1,k+2, k+1,k+3,k+2);}
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
+    const roofMesh=new THREE.Mesh(g, info.opaque
       ? new THREE.MeshStandardMaterial({color:roofColor,side:THREE.DoubleSide,roughness:.5,metalness:.35})
-      : new THREE.MeshStandardMaterial({color:roofColor,side:THREE.DoubleSide,transparent:true,opacity,roughness:.25,metalness:0,depthWrite:false}));
-  roofMesh.castShadow=true; roofMesh.receiveShadow=!!info.opaque;
-  const showRoof=$('showRoof').checked;
-  roofMesh.visible=showRoof; model.add(roofMesh);
-  // стыки листов / волны профнастила
-  const roofLines=new THREE.Group(); roofLines.visible=showRoof; model.add(roofLines);
-  const jointStep = info.opaque ? 0.2 : info.sheetW;
-  const lineMat=new THREE.LineBasicMaterial({color: info.opaque? new THREE.Color(roofColor).multiplyScalar(.6) : '#7a8796'});
-  for(let z=z0; z<=z1+1e-6; z+=jointStep){
-    roofLines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp.map(([x,y])=>v3(x,y+0.003,z))), lineMat));
+      : new THREE.MeshStandardMaterial({color:roofColor,side:THREE.DoubleSide,transparent:true,opacity,roughness:.2,metalness:0,depthWrite:false}));
+    roofMesh.castShadow=true; roofMesh.receiveShadow=!!info.opaque; roofMesh.renderOrder=2;
+    model.add(roofMesh);
+    // стыки листов / волны профнастила — одним объектом
+    const seg=[], jointStep=info.opaque?0.2:info.sheetW;
+    const zl=[]; for(let z=z0; z<z1-1e-6; z+=jointStep) zl.push(z); zl.push(z1);
+    zl.forEach(z=>{ for(let i=0;i<rp.length-1;i++) seg.push(rp[i][0],rp[i][1]+.004,z, rp[i+1][0],rp[i+1][1]+.004,z); });
+    [0,rp.length-1].forEach(i=>seg.push(rp[i][0],rp[i][1]+.004,z0, rp[i][0],rp[i][1]+.004,z1));
+    const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(seg,3));
+    const lines=new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color: info.opaque ? new THREE.Color(roofColor).multiplyScalar(.62) : new THREE.Color('#6f7f90'), transparent:!info.opaque, opacity:info.opaque?1:.75}));
+    lines.renderOrder=3; model.add(lines);
   }
-  [z0,z1].forEach(z=>roofLines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp.map(([x,y])=>v3(x,y,z))), new THREE.LineBasicMaterial({color:'#555'}))));
 
+  // автомобили
+  if($('showCar').checked && L>=4.2){
+    const n=Math.max(1, Math.min(4, Math.floor((W-0.5)/2.5)));
+    const colors=['#7d8fa3','#b3443a','#e5e7ea','#39424e'];
+    for(let i=0;i<n;i++) car((i+.5)*W/n, floorY, L/2, colors[i%colors.length]);
+  }
   // человек для масштаба (≈1,75 м)
   if($('showPerson').checked){
-    const pm=mat('#3b4a63',{metalness:0,roughness:.8}), sk=mat('#e0b896',{metalness:0,roughness:.8});
     const pg=new THREE.Group();
-    const body=new THREE.Mesh(new THREE.CylinderGeometry(.17,.15,.62,16),pm); body.position.y=1.17;
-    const legs=new THREE.Mesh(new THREE.CylinderGeometry(.14,.12,.86,16),mat('#2a2f38',{metalness:0})); legs.position.y=.43;
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.12,16,12),sk); head.position.y=1.63;
-    [body,legs,head].forEach(m=>{m.castShadow=true;pg.add(m);});
-    pg.position.set(Math.min(W*0.35,1.4),0,L+0.9); model.add(pg);
+    const add=(geo,m,y)=>{const o=new THREE.Mesh(geo,m); o.position.y=y; o.castShadow=true; pg.add(o);};
+    add(new THREE.CylinderGeometry(.13,.11,.86,14), mat('#2c3440',{metalness:0,roughness:.9}), .43);
+    add(new THREE.CylinderGeometry(.18,.15,.6,14), mat('#f5b800',{metalness:0,roughness:.8}), 1.16);
+    add(new THREE.SphereGeometry(.115,16,12), mat('#e2bd9c',{metalness:0,roughness:.8}), 1.63);
+    pg.position.set(W*0.22,0,L+1.6); model.add(pg);
   }
 
   // размеры
-  const ridge = Math.max(...rp.map(p=>p[1]));
+  const ridge=Math.max(...rp.map(p=>p[1]));
+  const r=Math.max(W,L,ridge);
   if($('showDims').checked){
-    dim(v3(0,.02,L+.7), v3(W,.02,L+.7), fmt(W)+' м', v3(0,0,1));
-    dim(v3(-.7,.02,0), v3(-.7,.02,L), fmt(L)+' м', v3(-1,0,0));
-    dim(v3(-.5,0,L+.5), v3(-.5,H,L+.5), fmt(H)+' м', v3(-1,0,0));
-    const xr=W+.5+(wall?.5:0);
-    dim(v3(xr,0,L+.5), v3(xr,ridge,L+.5), fmt(ridge)+' м', v3(1,0,0));
+    const lh=Math.min(.6,Math.max(.3,r*0.05));
+    dim(v3(0,.1,L+.9), v3(W,.1,L+.9), fmt(W)+' м', v3(0,0,1), lh);
+    dim(v3(-.9,.1,0), v3(-.9,.1,L), fmt(L)+' м', v3(-1,0,0), lh);
+    dim(v3(-.6,0,L+.6), v3(-.6,H,L+.6), fmt(H)+' м', v3(-1,0,0), lh);
+    const xr=W+.7+(wall?.5:0);
+    dim(v3(xr,0,L+.6), v3(xr,ridge,L+.6), fmt(ridge)+' м', v3(1,0,0), lh);
   }
 
-  report({W,L,nP:nP*sides.length,nF,dev,ridge,info,z0,z1,lathCount:lathPts.length});
-  if(!fitted){fitView('iso');fitted=true;}
-}
-let fitted=false;
-const fmt=v=>(+v).toFixed(2).replace(/\.?0+$/,'').replace('.',',');
+  // свет и тени под размер модели
+  const c=v3(W/2,ridge/2,L/2), sr=Math.hypot(W,L,ridge)/2+3;
+  sun.position.set(c.x-sr*.7, sr*1.7, c.z+sr*1.1); sun.target.position.copy(c);
+  Object.assign(sun.shadow.camera,{left:-sr,right:sr,top:sr,bottom:-sr,near:.5,far:sr*5}); sun.shadow.camera.updateProjectionMatrix();
 
+  // камера следует за размерами
+  if(refit || lastR===null){ fitView('iso'); refit=false; }
+  else{
+    const off=camera.position.clone().sub(controls.target).multiplyScalar(r/lastR);
+    controls.target.copy(c); camera.position.copy(c).add(off); controls.update();
+  }
+  lastR=r;
+
+  report({W,L,nP:nP*sides.length,nF,dev,ridge,info,z0,z1,lathCount:lathPts.length,T});
+}
+const fmt=v=>(+v).toFixed(2).replace(/\.?0+$/,'').replace('.',',');
+const f1=v=>(+v).toFixed(1).replace('.',',');
+const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return n+' '+((m>10&&m<20)?c:k===1?a:(k>=2&&k<=4)?b:c);};
+
+function car(x,y,z,color){
+  const g=new THREE.Group();
+  const paint=mat(color,{metalness:.5,roughness:.35}), glass=mat('#26313d',{metalness:.3,roughness:.2}), tyre=mat('#1c1d1f',{metalness:0,roughness:.9});
+  const add=(geo,m,px,py,pz)=>{const o=new THREE.Mesh(geo,m); o.position.set(px,py,pz); o.castShadow=true; g.add(o); return o;};
+  add(new THREE.BoxGeometry(1.8,.6,4.3), paint, 0,.55,0);
+  add(new THREE.BoxGeometry(1.62,.5,2.2), glass, 0,1.1,-.25);
+  add(new THREE.BoxGeometry(1.66,.06,2.1), paint, 0,1.37,-.25);
+  [[-.8,1.35],[.8,1.35],[-.8,-1.35],[.8,-1.35]].forEach(([wx,wz])=>{
+    const w=add(new THREE.CylinderGeometry(.31,.31,.24,20), tyre, wx,.31,wz); w.rotation.z=Math.PI/2;
+  });
+  g.position.set(x,y,z); model.add(g);
+}
+let labels=[];
+function sizeLabels(){
+  // высота подписи ≈ 24 px при любом масштабе и размере окна
+  const vh=view.clientHeight||600, h=(isTouch?22:24)/vh*2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+  labels.forEach(s=>s.scale.set(h*s.userData.aspect,h,1));
+}
 function label(text){
-  const c=document.createElement('canvas'), ctx=c.getContext('2d'), fs=56, font=`600 ${fs}px -apple-system,Segoe UI,Arial`;
+  const c=document.createElement('canvas'), ctx=c.getContext('2d'), fs=52, font=`700 ${fs}px "Golos Text",-apple-system,"Segoe UI",Arial,sans-serif`;
   ctx.font=font;
-  c.width=Math.ceil(ctx.measureText(text).width+28); c.height=fs+24;
+  c.width=Math.ceil(ctx.measureText(text).width+36); c.height=fs+26;
   ctx.font=font;
-  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillRect(0,0,c.width,c.height);
-  ctx.fillStyle='#1d2330'; ctx.textBaseline='middle'; ctx.fillText(text,14,c.height/2+2);
+  ctx.fillStyle='#17212b'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#f5b800'; ctx.fillRect(4,4,c.width-8,c.height-8);
+  ctx.fillStyle='#17212b'; ctx.textBaseline='middle'; ctx.fillText(text,18,c.height/2+3);
   const tex=new THREE.CanvasTexture(c); tex.encoding=THREE.sRGBEncoding;
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));
-  const h=0.32; s.scale.set(h*c.width/c.height,h,1); s.renderOrder=10;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,fog:false,sizeAttenuation:false}));
+  s.userData.aspect=c.width/c.height; s.renderOrder=10; labels.push(s); sizeLabels();
   return s;
 }
-function dim(a,b,text,outward){
-  const m=new THREE.LineBasicMaterial({color:'#c0392b',depthTest:false});
-  const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),m); l.renderOrder=9; model.add(l);
+function dim(a,b,text,outward,lh){
+  const m=new THREE.LineBasicMaterial({color:'#17212b',depthTest:false,fog:false});
   const dir=new THREE.Vector3().subVectors(b,a).normalize();
   let tick=new THREE.Vector3().crossVectors(dir,outward); if(tick.lengthSq()<1e-6) tick=outward.clone();
-  tick.normalize().multiplyScalar(.12);
-  [a,b].forEach(p=>{const t=new THREE.Line(new THREE.BufferGeometry().setFromPoints([p.clone().add(tick),p.clone().sub(tick)]),m);t.renderOrder=9;model.add(t);});
-  const s=label(text); s.position.copy(a).add(b).multiplyScalar(.5).add(outward.clone().multiplyScalar(.25)); model.add(s);
+  tick.normalize().multiplyScalar(.14);
+  const pts=[a,b]; [a,b].forEach(p=>pts.push(p.clone().add(tick),p.clone().sub(tick)));
+  const l=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),m); l.renderOrder=9; model.add(l);
+  const s=label(text); s.position.copy(a).add(b).multiplyScalar(.5).add(outward.clone().multiplyScalar(.3)); model.add(s);
 }
 
 // ---------- спецификация ----------
+let csvRows=[];
 function report(d){
   const rows=Object.values(spec);
   const order=['Столбы','Продольные балки','Пристенная балка','Верхний пояс ферм','Нижний пояс ферм','Раскосы и стойки','Обрешётка'];
   const counted=['Столбы','Продольные балки','Пристенная балка','Обрешётка'];
   rows.sort((a,b)=>order.indexOf(a.role)-order.indexOf(b.role));
-  let mass=0, paint=0, html='<tr><th>Позиция</th><th>Сечение, мм</th><th class="n">Кол-во</th><th class="n">Длина, м</th><th class="n">Масса, кг</th></tr>';
-  const bySec={};
+  csvRows=[['Позиция','Сечение / описание','Кол-во','Длина, м','Масса, кг']];
+  let html='';
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const group=(t)=>{ html+=`<tr class="grp"><th colspan="5">${t}</th></tr>`; csvRows.push([t]); };
+  const line=(a,b,c,dd,e,cls)=>{
+    html+=`<tr${cls?` class="${cls}"`:''}><td>${esc(a)}</td><td>${esc(b||'')}</td><td class="n">${esc(c||'')}</td><td class="n">${esc(dd||'')}</td><td class="n">${esc(e||'')}</td></tr>`;
+    csvRows.push([a,b||'',c||'',dd||'',e||'']);
+  };
+  html+='<tr><th>Позиция</th><th>Сечение, мм</th><th class="n">Кол-во</th><th class="n">Длина, м</th><th class="n">Масса, кг</th></tr>';
+  group('Каркас');
+  let mass=0, paint=0; const bySec={};
   rows.forEach(r=>{
     const S=sec(r.s), kg=r.len*S.kgm; mass+=kg; paint+=r.len*S.perim;
     bySec[r.s]=(bySec[r.s]||0)+r.len;
-    html+=`<tr><td>${r.role}</td><td>${r.s.replace(/x/g,' × ')}</td><td class="n">${counted.includes(r.role)?r.n+' шт':''}</td><td class="n">${r.len.toFixed(1)}</td><td class="n">${kg.toFixed(0)}</td></tr>`;
+    line(r.role, secName(r.s), counted.includes(r.role)?r.n+' шт':'', f1(r.len), kg.toFixed(0));
   });
-  html+=`<tr class="tot"><td>Итого металл</td><td></td><td></td><td class="n">${rows.reduce((s,r)=>s+r.len,0).toFixed(1)}</td><td class="n">${mass.toFixed(0)}</td></tr>`;
-  html+='<tr><th colspan="5">Закупка трубы (хлысты по 6 м, +5% на обрезки)</th></tr>';
+  line('Всего металла','', '', f1(rows.reduce((s,r)=>s+r.len,0)), mass.toFixed(0), 'tot');
+  group('Сколько трубы купить: хлысты по 6 м, запас 5 %');
   Object.keys(bySec).sort((a,b)=>PIPES.indexOf(a)-PIPES.indexOf(b)).forEach(s=>{
     const len=bySec[s]*1.05;
-    html+=`<tr><td>Профтруба</td><td>${s.replace(/x/g,' × ')}</td><td class="n">${Math.ceil(len/6)} шт</td><td class="n">${len.toFixed(1)}</td><td class="n">${(len*sec(s).kgm).toFixed(0)}</td></tr>`;
+    line('Профильная труба', secName(s), Math.ceil(len/6-1e-9)+' шт', f1(len), (len*sec(s).kgm).toFixed(0));
   });
   // кровля
   const info=d.info, roofLen=d.z1-d.z0, area=d.dev*roofLen;
-  html+='<tr><th colspan="5">Кровля и прочее</th></tr>';
+  group('Кровля и крепёж');
   const cols=Math.ceil(roofLen/info.sheetW-1e-9);
   let sheetsTxt;
   if(info.sheetL){
     let best=null;
     info.sheetL.forEach(SL=>{
-      const n = d.dev<=SL ? Math.ceil(cols/Math.floor(SL/d.dev)) : cols*Math.ceil(d.dev/SL);
+      const n = d.dev<=SL ? Math.ceil(cols/Math.floor(SL/d.dev+1e-9)) : cols*Math.ceil(d.dev/SL-1e-9);
       const waste=n*SL*info.sheetW-area;
       if(!best||waste<best.waste) best={SL,n,waste};
     });
-    sheetsTxt=`${best.n} листов ${fmt(info.sheetW)}×${best.SL} м`;
-  }else{
-    sheetsTxt=`${cols} листов по ${fmt(d.dev)} м (шир. ${fmt(info.sheetW)} м)`;
-  }
-  html+=`<tr><td>${info.name}, ${P.roofColor.toLowerCase()}</td><td colspan="2">${sheetsTxt}</td><td class="n">${area.toFixed(1)} м²</td><td class="n">${(area*info.kgm2).toFixed(0)}</td></tr>`;
+    sheetsTxt=`${plural(best.n,'лист','листа','листов')} ${fmt(info.sheetW)} × ${fmt(best.SL)} м`;
+  }else sheetsTxt=`${plural(cols,'лист','листа','листов')} по ${fmt(d.dev)} м, ширина ${fmt(info.sheetW)} м`;
+  line(`${info.name}, ${P.roofColor.toLowerCase()}`, sheetsTxt, '', f1(area)+' м²', (area*info.kgm2).toFixed(0));
   if(!info.opaque){
-    html+=`<tr><td>Термошайбы с саморезами</td><td></td><td class="n">≈ ${Math.ceil(d.lathCount*roofLen/0.4)} шт</td><td></td><td></td></tr>`;
-    html+=`<tr><td>Соединительный профиль</td><td></td><td class="n">${Math.max(0,cols-1)} шт</td><td class="n">${(Math.max(0,cols-1)*d.dev).toFixed(1)}</td><td></td></tr>`;
-    html+=`<tr><td>Торцевой профиль / лента</td><td></td><td></td><td class="n">${(2*roofLen).toFixed(1)}</td><td></td></tr>`;
+    line('Термошайбы с саморезами','', '≈ '+Math.ceil(d.lathCount*roofLen/0.4)+' шт');
+    if(cols>1) line('Соединительный профиль','', (cols-1)+' шт', f1((cols-1)*d.dev));
+    line('Торцевой профиль и лента','', '', f1(2*roofLen));
   }else{
-    html+=`<tr><td>Кровельные саморезы</td><td></td><td class="n">≈ ${Math.ceil(area*7)} шт</td><td></td><td></td></tr>`;
-    if(P.roofType==='gable') html+=`<tr><td>Конёк (планки по 2 м)</td><td></td><td class="n">${Math.ceil(roofLen/1.9)} шт</td><td class="n">${roofLen.toFixed(1)}</td><td></td></tr>`;
+    line('Кровельные саморезы','', '≈ '+Math.ceil(area*7)+' шт');
+    if(P.roofType==='gable') line('Конёк, планки по 2 м','', Math.ceil(roofLen/1.9)+' шт', f1(roofLen));
   }
-  if(P.install==='base'){
-    html+=`<tr><td>Опорные пластины 200×200 + анкеры</td><td></td><td class="n">${d.nP} / ${d.nP*4} шт</td><td></td><td></td></tr>`;
-  }else{
-    const vol=d.nP*Math.PI*0.15*0.15*P.concreteDepth;
-    html+=`<tr><td>Бетон М200 (скважины Ø300)</td><td></td><td class="n">${vol.toFixed(2)} м³</td><td></td><td></td></tr>`;
-  }
-  html+=`<tr><td>Площадь окраски каркаса</td><td></td><td class="n">${paint.toFixed(1)} м²</td><td></td><td></td></tr>`;
+  group('Установка и покраска');
+  if(P.install==='base') line('Опорные пластины 200 × 200 мм','', d.nP+' шт'), line('Анкерные болты','', d.nP*4+' шт');
+  else line('Бетон М200, скважины Ø 300 мм','', fmt(d.nP*Math.PI*0.15*0.15*P.concreteDepth)+' м³');
+  line('Площадь окраски каркаса','', f1(paint)+' м²');
   $('spec').innerHTML=html;
-  $('summary').innerHTML=`<b>${fmt(d.W)} × ${fmt(d.L)} м</b> · ${fmt(d.W*d.L)} м²<br>`+
-    `Столбов: ${d.nP} · ферм: ${d.nF}<br>Высота в коньке: ${fmt(d.ridge)} м<br>Металл: ${mass.toFixed(0)} кг`;
-  let w='';
-  if(P.roofType==='arch' && info.opaque) w='Профнастил и металлочерепица плохо гнутся: для арки обычно берут поликарбонат.';
-  else if(d.W>6 && P.chordSec==='40x40x2') w='Для пролёта больше 6 м пояса 40×40 тонковаты, лучше 60×40 или 60×60.';
-  else if(P.lathStep>0.8 && !info.opaque) w='Для поликарбоната шаг обрешётки обычно не больше 0,7–0,8 м.';
-  $('warn').textContent=w;
+
+  const T=d.T;
+  const slope = T.angle!==null ? Math.round(THREE.MathUtils.radToDeg(T.angle))+'°' : 'R '+fmt(T.radius)+' м';
+  const cell=(k,v)=>`<div class="cell"><span>${k}</span><b>${v}</b></div>`;
+  $('stamp').innerHTML=`<div class="big">${fmt(d.W)} × ${fmt(d.L)} м</div>`+
+    cell('Площадь',fmt(d.W*d.L)+' м²')+cell('Столбы',d.nP+' шт')+cell('Фермы',d.nF+' шт')+
+    cell('В коньке',fmt(d.ridge)+' м')+cell(T.angle!==null?'Уклон':'Радиус арки',slope)+cell('Металл',mass.toFixed(0)+' кг');
+
+  const notes=[];
+  if(T.clamped) notes.push('Подъём арки ограничен: он не может быть больше 0,45 ширины навеса.');
+  if(P.roofType==='arch' && info.opaque) notes.push('Профнастил и металлочерепица плохо гнутся по дуге. Для арки обычно берут поликарбонат.');
+  if(T.angle!==null && THREE.MathUtils.radToDeg(T.angle)<6) notes.push('Уклон меньше 6°: вода и снег будут сходить плохо. Увеличьте подъём крыши.');
+  if(d.W>6 && sec(P.chordSec).a*sec(P.chordSec).b<0.06*0.04-1e-9) notes.push('Для пролёта больше 6 м пояса ферм 40 × 40 слабоваты. Возьмите 60 × 40 или 60 × 60.');
+  if(P.lathStep>0.8 && !info.opaque) notes.push('Для поликарбоната шаг обрешётки обычно не больше 0,7–0,8 м.');
+  if(P.pillarStep>3 && sec(P.pillarSec).a<0.08) notes.push('При шаге столбов больше 3 м берите столб не меньше 80 × 80.');
+  $('notes').innerHTML=notes.map(n=>`<div>${n}</div>`).join('');
 }
 
 // ---------- камера ----------
 function fitView(kind){
   const W=P.width, L=P.length, Hh=P.height+P.rise;
   const c=v3(W/2,Hh/2,L/2), r=Math.max(W,L,Hh)*1.05+2;
-  const dirs={iso:v3(-0.9,0.6,1.1),front:v3(0,0.12,1),side:v3(-1,0.12,0),top:v3(0.001,1,0.001)};
+  const dirs={iso:v3(-0.9,0.55,1.15),front:v3(0,0.1,1),side:v3(-1,0.1,0),top:v3(0.001,1,0.001)};
   const d=dirs[kind].normalize();
-  let dist=r/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*0.62;
+  let dist=r/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*0.64;
   if(camera.aspect<1.3) dist*=1.25/Math.max(0.6,camera.aspect); // узкий экран телефона
   camera.position.copy(c).add(d.multiplyScalar(dist));
   controls.target.copy(c); controls.update();
 }
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>fitView(b.dataset.view));
-$('shot').onclick=()=>{
+document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>fitView(b.dataset.view)));
+function download(href,name){ const a=document.createElement('a'); a.href=href; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+$('shot').addEventListener('click',()=>{
   renderer.render(scene,camera);
-  const a=document.createElement('a'); a.href=renderer.domElement.toDataURL('image/png');
-  a.download=`навес_${P.width}x${P.length}.png`; a.click();
-};
-$('print').onclick=()=>window.print();
+  download(renderer.domElement.toDataURL('image/png'), `naves_${P.width}x${P.length}.png`);
+});
+$('csv').addEventListener('click',()=>{
+  const txt=csvRows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const url=URL.createObjectURL(new Blob(['﻿'+txt],{type:'text/csv;charset=utf-8'}));
+  download(url, `naves_${P.width}x${P.length}.csv`); setTimeout(()=>URL.revokeObjectURL(url),2000);
+});
+$('print').addEventListener('click',()=>window.print());
+$('copyLink').addEventListener('click',async()=>{
+  const b=$('copyLink'); let ok=false;
+  try{ await navigator.clipboard.writeText(location.href); ok=true; }
+  catch(e){
+    const t=document.createElement('textarea'); t.value=location.href; t.style.position='fixed'; t.style.opacity='0';
+    document.body.appendChild(t); t.select(); try{ ok=document.execCommand('copy'); }catch(_){} t.remove();
+  }
+  b.textContent = ok ? 'Ссылка скопирована' : 'Скопируйте адрес из строки браузера';
+  setTimeout(()=>{ b.textContent='Скопировать ссылку'; }, 2200);
+});
+if(isTouch) $('hint').style.display='none';
 
-function loop(){ controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop); }
-syncUI(); resize(); rebuild(); loop();
+function loop(){
+  requestAnimationFrame(loop); // следующий кадр планируем первым: ошибка кадра не остановит анимацию
+  try{ controls.update(); renderer.render(scene,camera); }catch(e){ console.error(e); }
+}
+window.__calc={get P(){return P;}, set(p){ P=sanitize(Object.assign({},DEFAULTS,p)); syncUI(); rebuild(); }, info:()=>renderer.info};
+syncUI(); resize(); rebuild(); save(); loop();
 new ResizeObserver(resize).observe(view);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>schedule()); // подписи размеров — уже нужным шрифтом
 })();
 </script>
 </body>
