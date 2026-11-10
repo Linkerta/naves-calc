@@ -47,8 +47,8 @@
   .num button{border:0;background:transparent;font-size:18px;line-height:1;cursor:pointer;color:var(--steel);touch-action:manipulation}
   .num button:hover{background:var(--tape-soft);color:var(--ink)}
   .num button:active{background:var(--tape)}
-  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:4px 0 10px}
-  .seg button{border:1px solid var(--rule);background:var(--field);border-radius:4px;padding:8px 4px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12.5px}
+  .seg{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:4px 0 10px}
+  .seg button{border:1px solid var(--rule);background:var(--field);border-radius:4px;padding:7px 4px 5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12.5px}
   .seg button svg{width:54px;height:26px;stroke:var(--steel);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .seg button:hover{border-color:var(--steel)}
   .seg button[aria-pressed=true]{background:var(--tape);border-color:var(--ink);font-weight:700}
@@ -221,8 +221,11 @@
         <div class="seg" id="roofTypeSeg" role="group" aria-label="Тип крыши">
           <button type="button" data-val="single"><svg viewBox="0 0 54 26"><path d="M5 20 L49 6 M9 20 V24 M45 8 V24 M9 20 H45"/></svg>Односкатная</button>
           <button type="button" data-val="gable"><svg viewBox="0 0 54 26"><path d="M5 18 L27 5 L49 18 M9 17 V24 M45 17 V24 M9 17 H45"/></svg>Двускатная</button>
+          <button type="button" data-val="split"><svg viewBox="0 0 54 26"><path d="M5 20 L32 6 M27 13 L49 20 M9 19 V24 M45 19 V24 M27 9 V13"/></svg>С перепадом</button>
           <button type="button" data-val="arch"><svg viewBox="0 0 54 26"><path d="M5 18 Q27 -4 49 18 M9 15 V24 M45 15 V24"/></svg>Арочная</button>
         </div>
+        <div class="row" id="rowRidgeDrop"><label for="ridgeDrop">Перепад скатов в коньке, м</label><input type="number" inputmode="decimal" id="ridgeDrop" min="0.1" max="1" step="0.05"></div>
+        <div class="row" id="rowRidgeOver"><label for="ridgeOver">Нахлёст верхнего ската, м</label><input type="number" inputmode="decimal" id="ridgeOver" min="0" max="1" step="0.05"></div>
         <div class="row" id="rowFarmDepth"><label for="farmDepth">Высота арочной фермы, м</label><input type="number" inputmode="decimal" id="farmDepth" min="0.1" max="0.6" step="0.01"></div>
         <div class="row"><label for="farmStep">Шаг ферм, м</label><input type="number" inputmode="decimal" id="farmStep" min="0.5" max="2" step="0.05"></div>
         <div class="row"><label for="lathStep">Шаг обрешётки, м</label><input type="number" inputmode="decimal" id="lathStep" min="0.3" max="1.2" step="0.05"></div>
@@ -323,7 +326,7 @@
 // ---------- справочники ----------
 const PIPES = ['40x20x1.5','40x40x2','60x40x2','60x60x2','80x40x2','80x80x3','100x100x3','120x120x4'];
 const DEFAULTS = {
-  width:4.5, length:6, height:2.5, rise:0.8, roofType:'single', farmDepth:0.25,
+  width:4.5, length:6, height:2.5, rise:0.8, roofType:'single', farmDepth:0.25, ridgeDrop:0.3, ridgeOver:0.4,
   farmStep:1.0, lathStep:0.6, ovx:0.2, ovz:0.15, pillarStep:2.5, install:'base', concreteDepth:1.0, wall:false,
   pillarSec:'80x80x3', beamSec:'80x40x2', chordSec:'40x40x2', webSec:'40x20x1.5', lathSec:'40x20x1.5',
   roofMat:'pc10', roofColor:'Бронза', frameColor:'Чёрный RAL 9005', stock:'6'
@@ -332,6 +335,7 @@ const PRESETS = [
   ['Одна машина 3,5 × 6', {width:3.5,length:6}],
   ['Две машины 6 × 6', {width:6,length:6,chordSec:'60x40x2'}],
   ['Терраса 3 × 4', {width:3,length:4,height:2.3,rise:0.5,pillarSec:'60x60x2',pillarStep:2}],
+  ['С перепадом 6 × 8', {width:6,length:8,roofType:'split',rise:1.1,roofMat:'prof',roofColor:'Графит RAL 7024',chordSec:'60x40x2'}],
   ['Арка 5 × 8', {width:5,length:8,roofType:'arch',rise:1}]
 ];
 const PC_COLORS = {'Прозрачный':['#cfe6ff',.45],'Бронза':['#8c6b3f',.6],'Янтарь':['#e8a33c',.6],'Синий':['#3a7bd5',.55],
@@ -346,14 +350,14 @@ const ROOF_INFO = {
   prof:{name:'Профнастил С-20', colors:RAL, sheetW:1.10, sheetL:null, kgm2:4.4, opaque:true},
   tile:{name:'Металлочерепица', colors:RAL, sheetW:1.10, sheetL:null, kgm2:4.6, opaque:true}
 };
-const ROOF_TYPES = ['single','gable','arch'];
+const ROOF_TYPES = ['single','gable','split','arch'];
 const STEEL = 7850;
 function sec(s){const [a,b,t]=s.split('x').map(Number);return {a:a/1000,b:b/1000,t:t/1000,
   kgm:(a*b-(a-2*t)*(b-2*t))*1e-6*STEEL, perim:2*(a+b)/1000};}
 const secName = s => s.replace(/x/g,' × ').replace('.',',');
 
 const $ = id => document.getElementById(id);
-const NUMS = ['width','length','height','rise','farmDepth','farmStep','lathStep','ovx','ovz','pillarStep','concreteDepth'];
+const NUMS = ['width','length','height','rise','farmDepth','ridgeDrop','ridgeOver','farmStep','lathStep','ovx','ovz','pillarStep','concreteDepth'];
 const SELS = ['install','pillarSec','beamSec','chordSec','webSec','lathSec','roofMat','stock'];
 document.querySelectorAll('select.pipe').forEach(s=>{
   PIPES.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=secName(p);s.appendChild(o);});
@@ -430,6 +434,8 @@ function syncUI(){
   $('wall').checked=P.wall;
   document.querySelectorAll('#roofTypeSeg button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.val===P.roofType));
   $('rowFarmDepth').classList.toggle('hidden', P.roofType!=='arch');
+  $('rowRidgeDrop').classList.toggle('hidden', P.roofType!=='split');
+  $('rowRidgeOver').classList.toggle('hidden', P.roofType!=='split');
   $('rowDepth').classList.toggle('hidden', P.install!=='concrete');
   $('rowWall').style.display = P.roofType==='single' ? 'flex' : 'none';
   buildSwatches();
@@ -565,39 +571,50 @@ const v3=(x,y,z)=>new THREE.Vector3(x,y,z);
 const linspace=(a,b,n)=>Array.from({length:n},(_,i)=>n===1?a:a+(b-a)*i/(n-1));
 
 function trussProfile(){
-  const W=P.width, ch=sec(P.chordSec), yb=P.height+ch.a/2;
-  const S = P.roofType==='arch' ? Math.min(P.rise, W*0.45) : P.rise;
+  const W=P.width, ch=sec(P.chordSec), yb=P.height+ch.a/2, rt=P.roofType;
+  const S = rt==='arch' ? Math.min(P.rise, W*0.45) : P.rise;
   const h0=Math.min(0.15,S*0.5);
   let N=Math.max(4,Math.round(W/0.6)); if(N%2) N++;
   const xs=linspace(0,W,N+1);
-  let top, bot, angle=null, radius=null;
-  if(P.roofType==='single'){
-    top=x=>yb+h0+(S-h0)*x/W; bot=()=>yb; angle=Math.atan((S-h0)/W);
-  }else if(P.roofType==='gable'){
-    top=x=>yb+h0+(S-h0)*(1-Math.abs(2*x/W-1)); bot=()=>yb; angle=Math.atan((S-h0)/(W/2));
+  let top, topR=null, bot=()=>yb, angle=null, radius=null, tops, roofs, botPts=[[0,yb],[W,yb]];
+  if(rt==='single'){
+    top=x=>yb+h0+(S-h0)*x/W; angle=Math.atan((S-h0)/W);
+    tops=[[[0,top(0)],[W,top(W)]]]; roofs=[{pts:tops[0],ovA:true,ovB:true,pieces:1}];
+  }else if(rt==='gable'){
+    top=x=>yb+h0+(S-h0)*(1-Math.abs(2*x/W-1)); angle=Math.atan((S-h0)/(W/2));
+    tops=[[[0,top(0)],[W/2,top(W/2)]],[[W/2,top(W/2)],[W,top(W)]]];
+    roofs=[{pts:[[0,top(0)],[W/2,top(W/2)],[W,top(W)]],ovA:true,ovB:true,pieces:2}];
+  }else if(rt==='split'){
+    // два ската на разной высоте: левый выше и заходит над правым
+    const k=(S-h0)/(W/2), SR=Math.max(h0+0.05, S-P.ridgeDrop), kR=(SR-h0)/(W/2);
+    const Lf=x=>yb+h0+k*x, Rf=x=>yb+h0+kR*(W-x);
+    top=x=>x<=W/2+1e-9?Lf(x):Rf(x); topR=Rf; angle=Math.atan(k);
+    const xe=W/2+P.ridgeOver*Math.cos(angle);
+    tops=[[[0,Lf(0)],[xe,Lf(xe)]],[[W/2,Rf(W/2)],[W,Rf(W)]]];
+    roofs=[{pts:tops[0],ovA:true,ovB:false,pieces:1},{pts:tops[1],ovA:false,ovB:true,pieces:1}];
   }else{
     const R=(W*W/4+S*S)/(2*S), cy=S-R; radius=R;
     const f=x=>cy+Math.sqrt(Math.max(0,R*R-(x-W/2)**2));
     top=x=>yb+P.farmDepth+f(x); bot=x=>yb+f(x);
+    const fine=linspace(0,W,Math.max(24,N*2)+1);
+    tops=[fine.map(x=>[x,top(x)])]; botPts=fine.map(x=>[x,bot(x)]);
+    roofs=[{pts:tops[0],ovA:true,ovB:true,pieces:1}];
   }
-  const fine = P.roofType==='arch' ? linspace(0,W,Math.max(24,N*2)+1) : (P.roofType==='gable'?[0,W/2,W]:[0,W]);
-  return {xs, N, top, bot, fine, yb, angle, radius, clamped:S<P.rise};
+  return {xs, N, top, topR:topR||top, bot, tops, botPts, roofs, yb, angle, radius, clamped:S<P.rise};
 }
+const plen=pts=>{ let s=0; for(let i=0;i<pts.length-1;i++) s+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); return s; };
 // детали одной фермы с марками: В — верхний пояс, Н — нижний, С — стойки, Р — раскосы
 function trussParts(T){
   const W=P.width, ch=sec(P.chordSec), list=[];
-  const polyLen=(f,xa,xb)=>{ const xs=T.fine.filter(x=>x>=xa-1e-9&&x<=xb+1e-9); let s=0; for(let i=0;i<xs.length-1;i++) s+=Math.hypot(xs[i+1]-xs[i], f(xs[i+1])-f(xs[i])); return s; };
-  const chord=(kind,name,f,xa,xb)=>list.push({kind,name,s:P.chordSec,len:polyLen(f,xa,xb),xa,xb});
-  if(P.roofType==='gable'){ chord('В','Верхний пояс',T.top,0,W/2); chord('В','Верхний пояс',T.top,W/2,W); }
-  else chord('В','Верхний пояс',T.top,0,W);
-  chord('Н','Нижний пояс',T.bot,0,W);
+  T.tops.forEach(pts=>list.push({kind:'В',name:'Верхний пояс',s:P.chordSec,len:plen(pts),pts}));
+  list.push({kind:'Н',name:'Нижний пояс',s:P.chordSec,len:plen(T.botPts),pts:T.botPts});
   const half=T.N/2;
   for(let i=0;i<=T.N;i++){
     const x=T.xs[i], h=T.top(x)-T.bot(x);
     if(h>ch.a*1.2) list.push({kind:'С',name:'Стойка',s:P.webSec,len:h-ch.a,a:[x,T.bot(x)+ch.a/2],b:[x,T.top(x)-ch.a/2]});
     if(i<T.N){
       const x2=T.xs[i+1], forward = P.roofType==='single' ? true : i<half;
-      const a = forward ? [x,T.bot(x)] : [x,T.top(x)], b = forward ? [x2,T.top(x2)] : [x2,T.bot(x2)];
+      const a = forward ? [x,T.bot(x)] : [x,T.topR(x)], b = forward ? [x2,T.top(x2)] : [x2,T.bot(x2)];
       const dist=Math.hypot(b[0]-a[0],b[1]-a[1]), dy=Math.abs(b[1]-a[1]);
       // длина между поясами: по оси минус половины поясов с обеих сторон
       const len = dy>ch.a*1.5 ? dist*(dy-ch.a)/dy : Math.max(0.05, dist-ch.a);
@@ -632,6 +649,7 @@ function rebuild(){
   // освобождаем память видеокарты: геометрию и все материалы/текстуры, кроме общих
   const cached=new Set(Object.values(matCache));
   model.traverse(o=>{
+    if(o.userData.keep) return; // загруженные модели машины и человека живут между перестройками
     if(o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
     if(o.material && !cached.has(o.material)){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); }
     if(o.isInstancedMesh) o.dispose();
@@ -679,51 +697,45 @@ function rebuild(){
   const nF=Math.max(2, Math.ceil(L/P.farmStep-1e-9)+1);
   const TP=trussParts(T), fz=linspace(0,L,nF);
   fz.forEach(z=>{
-    for(let i=0;i<T.fine.length-1;i++){
-      const a=T.fine[i], b=T.fine[i+1];
-      member(v3(a,T.top(a),z), v3(b,T.top(b),z), P.chordSec);
-      member(v3(a,T.bot(a),z), v3(b,T.bot(b),z), P.chordSec);
-    }
+    T.tops.concat([T.botPts]).forEach(pts=>{ for(let i=0;i<pts.length-1;i++) member(v3(pts[i][0],pts[i][1],z), v3(pts[i+1][0],pts[i+1][1],z), P.chordSec); });
     TP.forEach(p=>{ if(p.a) member(v3(p.a[0],p.a[1],z), v3(p.b[0],p.b[1],z), p.s); });
   });
   TP.forEach(p=>part(p.kind==='В'?'Верхний пояс ферм':p.kind==='Н'?'Нижний пояс ферм':'Раскосы и стойки', p.mark, p.name, p.s, p.len, nF));
 
-  // профиль кровли (со свесом по скату), смещённый по нормали
-  const base=T.fine.map(x=>[x,T.top(x)]);
+  // кровля: один или несколько скатов; свес по скату, смещение по нормали
   const ext=(pA,pB,len)=>{const dx=pA[0]-pB[0],dy=pA[1]-pB[1],l=Math.hypot(dx,dy);return [pA[0]+dx/l*len,pA[1]+dy/l*len];};
-  const prof=[...base];
-  if(P.ovx>0.001){ prof.unshift(ext(base[0],base[1],P.ovx)); if(!wall) prof.push(ext(base[base.length-1],base[base.length-2],P.ovx)); }
   const offsetProfile=(pts,off)=>pts.map((p,i)=>{
     const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
     let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
     return [p[0]-ty*off, p[1]+tx*off];
   });
-  // обрешётка
-  const lathPts=[]; {
-    let acc=0, next=0; const step=P.lathStep;
+  if(wall) T.roofs[0].ovB=false;
+  const lathPts=[], rps=[], sheetLens=[];
+  T.roofs.forEach(R=>{
+    const base=R.pts, off=ch.a/2+lt.a/2, step=P.lathStep, mine=[];
+    let acc=0, next=0;
+    const put=(a,b,t)=>{ let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l; mine.push([a[0]+(b[0]-a[0])*t-ty*off, a[1]+(b[1]-a[1])*t+tx*off]); };
     for(let i=0;i<base.length-1;i++){
       const a=base[i], b=base[i+1], sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
-      while(next<=acc+sl+1e-6){ const t=(next-acc)/sl; lathPts.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, i]); next+=step; }
+      while(next<=acc+sl+1e-6){ put(a,b,(next-acc)/sl); next+=step; }
       acc+=sl;
     }
-    const last=base[base.length-1], lp=lathPts[lathPts.length-1];
-    if(Math.hypot(last[0]-lp[0],last[1]-lp[1])>step*0.3) lathPts.push([last[0],last[1],base.length-2]);
-  }
-  lathPts.forEach(([x,y,i])=>{
-    const a=base[i], b=base[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
-    const off=ch.a/2+lt.a/2, px=x-ty*off, py=y+tx*off;
-    member(v3(px,py,-P.ovz), v3(px,py,L+P.ovz), P.lathSec);
+    if(acc-(next-step)>step*0.3) put(base[base.length-2], base[base.length-1], 1);
+    lathPts.push(...mine);
+    const prof=[...base];
+    if(P.ovx>0.001){ if(R.ovA) prof.unshift(ext(base[0],base[1],P.ovx)); if(R.ovB) prof.push(ext(base[base.length-1],base[base.length-2],P.ovx)); }
+    const rp=offsetProfile(prof, ch.a/2+lt.a+0.006); rps.push(rp);
+    const d=plen(rp); for(let i=0;i<R.pieces;i++) sheetLens.push(d/R.pieces);
   });
+  lathPts.forEach(([px,py])=>member(v3(px,py,-P.ovz), v3(px,py,L+P.ovz), P.lathSec));
   part('Обрешётка','О','Прогон обрешётки',P.lathSec,L+2*P.ovz,lathPts.length);
   flushMembers(frameC);
 
-  // кровля
-  const rp=offsetProfile(prof, ch.a/2+lt.a+0.006);
-  let dev=0; for(let i=0;i<rp.length-1;i++) dev+=Math.hypot(rp[i+1][0]-rp[i][0],rp[i+1][1]-rp[i][1]);
+  const dev=sheetLens.reduce((a,b)=>a+b,0), rpAll=[].concat(...rps);
   const info=ROOF_INFO[P.roofMat], cval=info.colors[P.roofColor];
   const roofColor=Array.isArray(cval)?cval[0]:cval, opacity=Array.isArray(cval)?cval[1]:1;
   const z0=-P.ovz, z1=L+P.ovz;
-  if($('showRoof').checked){
+  if($('showRoof').checked) rps.forEach(rp=>{
     const pos=[], idx=[];
     rp.forEach(([x,y])=>{pos.push(x,y,z0, x,y,z1);});
     for(let i=0;i<rp.length-1;i++){const k=i*2; idx.push(k,k+1,k+2, k+1,k+3,k+2);}
@@ -741,26 +753,36 @@ function rebuild(){
     const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(seg,3));
     const lines=new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color: info.opaque ? new THREE.Color(roofColor).multiplyScalar(.62) : new THREE.Color('#6f7f90'), transparent:!info.opaque, opacity:info.opaque?1:.75}));
     lines.renderOrder=3; model.add(lines);
-  }
+  });
 
   // автомобили
   if($('showCar').checked && L>=4.2){
     const n=Math.max(1, Math.min(4, Math.floor((W-0.5)/2.5)));
     const colors=['#7d8fa3','#b3443a','#e5e7ea','#39424e'];
-    for(let i=0;i<n;i++) car((i+.5)*W/n, floorY, L/2, colors[i%colors.length]);
+    for(let i=0;i<n;i++){
+      const cx=(i+.5)*W/n, col=colors[i%colors.length];
+      if(carModel){
+        const c=carModel.clone(true);
+        c.traverse(o=>{ if(o.userData.paint) o.material=paintMat(col); });
+        c.position.set(cx, floorY+CAR.lift, L/2); model.add(c);
+      }else car(cx, floorY, L/2, col);
+    }
   }
   // человек для масштаба (≈1,75 м)
   if($('showPerson').checked){
-    const pg=new THREE.Group();
-    const add=(geo,m,y)=>{const o=new THREE.Mesh(geo,m); o.position.y=y; o.castShadow=true; pg.add(o);};
-    add(new THREE.CylinderGeometry(.13,.11,.86,14), mat('#2c3440',{metalness:0,roughness:.9}), .43);
-    add(new THREE.CylinderGeometry(.18,.15,.6,14), mat('#f5b800',{metalness:0,roughness:.8}), 1.16);
-    add(new THREE.SphereGeometry(.115,16,12), mat('#e2bd9c',{metalness:0,roughness:.8}), 1.63);
-    pg.position.set(W*0.22,0,L+1.6); model.add(pg);
+    if(personModel){ personModel.position.set(W*0.22,0,L+1.6); model.add(personModel); }
+    else{
+      const pg=new THREE.Group();
+      const add=(geo,m,y)=>{const o=new THREE.Mesh(geo,m); o.position.y=y; o.castShadow=true; pg.add(o);};
+      add(new THREE.CylinderGeometry(.13,.11,.86,14), mat('#2c3440',{metalness:0,roughness:.9}), .43);
+      add(new THREE.CylinderGeometry(.18,.15,.6,14), mat('#f5b800',{metalness:0,roughness:.8}), 1.16);
+      add(new THREE.SphereGeometry(.115,16,12), mat('#e2bd9c',{metalness:0,roughness:.8}), 1.63);
+      pg.position.set(W*0.22,0,L+1.6); model.add(pg);
+    }
   }
 
   // размеры
-  const ridge=Math.max(...rp.map(p=>p[1]));
+  const ridge=Math.max(...rpAll.map(p=>p[1]));
   const r=Math.max(W,L,ridge);
   if($('showDims').checked){
     const lh=Math.min(.6,Math.max(.3,r*0.05));
@@ -784,8 +806,8 @@ function rebuild(){
   }
   lastR=r;
 
-  G={W,L,H,nP:nP*sides.length,nF,dev,ridge,info,z0,z1,lathCount:lathPts.length,T,TP,rp,zs,fz,sides,pillarTop,below,wall,
-     lathX:lathPts.map(p=>p[0]), topMax:Math.max(...T.fine.map(T.top))+ch.a/2};
+  G={W,L,H,nP:nP*sides.length,nF,dev,ridge,info,z0,z1,lathCount:lathPts.length,T,TP,rps,rpAll,sheetLens,zs,fz,sides,pillarTop,below,wall,
+     lathX:lathPts.map(p=>p[0]), topMax:Math.max(...[].concat(...T.tops).map(p=>p[1]))+ch.a/2};
   report(G);
   renderTab();
 }
@@ -794,6 +816,46 @@ const fmt=v=>(+v).toFixed(2).replace(/\.?0+$/,'').replace('.',',');
 const f1=v=>(+v).toFixed(1).replace('.',',');
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return n+' '+((m>10&&m<20)?c:k===1?a:(k>=2&&k<=4)?b:c);};
 
+// ---------- готовые 3D-модели (Kenney, CC0): грузятся после первого кадра ----------
+let carModel=null, personModel=null;
+const CAR={lift:0.33}, paintMats={};
+const paintMat=c=>paintMats[c]||(paintMats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.35,metalness:.55}));
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+function b64buf(b){ const bin=atob(b), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u.buffer; }
+function loadModels(){
+  loadScript('lib/GLTFLoader.js').then(()=>loadScript('lib/models.js')).then(()=>{
+    const ld=new THREE.GLTFLoader(), M=window.NAVES_MODELS;
+    ld.parse(b64buf(M.car),'',g=>{ try{ prepCar(g.scene); schedule(); }catch(e){ console.warn(e); } }, e=>console.warn(e));
+    if(M.person) ld.parse(b64buf(M.person),'',g=>{ try{ prepPerson(g); schedule(); }catch(e){ console.warn(e); } }, e=>console.warn(e));
+  }).catch(e=>console.warn('Модели не загрузились, остаются простые фигуры', e));
+}
+function prepCar(root){
+  // игрушечные пропорции Kenney → габариты обычного седана ≈ 1,8 × 4,2 × 1,5 м; колёса остаются круглыми
+  const sx=1.2, sy=1.08, sz=1.72, kw=1.1;
+  root.traverse(o=>{
+    o.userData.keep=true;
+    if(o.isMesh){
+      const m=o.material, name=(m&&m.name)||'';
+      o.geometry.userData.shared=true; o.castShadow=true;
+      if(/^paint/.test(name)) o.userData.paint=true;
+      o.material = name==='window' ? mat('#232d38',{roughness:.12,metalness:.5})
+        : mat('#'+(m.color?m.color.getHexString():'888888'),{roughness: name==='carTire'?.9:.5, metalness: name==='wheelInside'?.7:.15});
+    }
+    if(/^wheel/.test(o.name)) o.scale.set(1, kw/sy, kw/sz);
+  });
+  root.scale.set(sx,sy,sz);
+  carModel=new THREE.Group(); carModel.userData.keep=true; carModel.add(root);
+}
+function prepPerson(g){
+  const root=g.scene;
+  if(g.animations && g.animations[0]){ const mx=new THREE.AnimationMixer(root); mx.clipAction(g.animations[0]).play(); mx.update(0.01); }
+  root.traverse(o=>{ o.userData.keep=true; if(o.isMesh){ o.castShadow=true; o.frustumCulled=false; o.geometry.userData.shared=true; if(o.material){ o.material.roughness=.85; o.material.metalness=0; } } });
+  root.updateMatrixWorld(true);
+  const bb=new THREE.Box3().setFromObject(root), h=bb.max.y-bb.min.y;
+  if(!(h>0)) return;
+  const k=1.75/h; root.scale.setScalar(k); root.position.y=-bb.min.y*k;
+  personModel=new THREE.Group(); personModel.userData.keep=true; personModel.add(root);
+}
 function car(x,y,z,color){
   const g=new THREE.Group();
   const paint=mat(color,{metalness:.5,roughness:.35}), glass=mat('#26313d',{metalness:.3,roughness:.2}), tyre=mat('#1c1d1f',{metalness:0,roughness:.9});
@@ -878,18 +940,23 @@ function report(d){
   const info=d.info, roofLen=d.z1-d.z0, area=d.dev*roofLen;
   group('Кровля и крепёж');
   const cols=Math.ceil(roofLen/info.sheetW-1e-9);
+  // длины полос по скатам: у двускатной и крыши с перепадом их две
+  const lens=[]; d.sheetLens.forEach(l=>{ const mm=Math.round(l*1000), e=lens.find(x=>x.mm===mm); if(e) e.n++; else lens.push({mm,n:1}); });
   let sheetsTxt;
   if(info.sheetL){
     let best=null;
     info.sheetL.forEach(SL=>{
-      const n = d.dev<=SL ? Math.ceil(cols/Math.floor(SL/d.dev+1e-9)) : cols*Math.ceil(d.dev/SL-1e-9);
+      const bins=[]; let n=0, pcs=[];
+      for(let c=0;c<cols;c++) d.sheetLens.forEach(l=>pcs.push(l));
+      pcs.sort((a,b)=>b-a).forEach(l=>{ if(l>SL){ n+=Math.ceil(l/SL-1e-9); return; } const i=bins.findIndex(f=>f>=l-1e-9); if(i<0) bins.push(SL-l); else bins[i]-=l; });
+      n+=bins.length;
       const waste=n*SL*info.sheetW-area;
       if(!best||waste<best.waste) best={SL,n,waste};
     });
     sheetsTxt=`${plural(best.n,'лист','листа','листов')} ${fmt(info.sheetW)} × ${fmt(best.SL)} м`;
-  }else sheetsTxt=`${plural(cols,'лист','листа','листов')} по ${fmt(d.dev)} м, ширина ${fmt(info.sheetW)} м`;
+  }else sheetsTxt=lens.map(x=>`${plural(cols*x.n,'лист','листа','листов')} по ${fmt(x.mm/1000)} м`).join(' и ')+`, ширина ${fmt(info.sheetW)} м`;
   line(`${info.name}, ${P.roofColor.toLowerCase()}`, sheetsTxt, '', f1(area)+' м²', (area*info.kgm2).toFixed(0));
-  roofCut={cols, roofLen, sheetsTxt, lastW:roofLen-(cols-1)*info.sheetW};
+  roofCut={cols, roofLen, sheetsTxt, lens, lastW:roofLen-(cols-1)*info.sheetW};
   if(!info.opaque){
     line('Термошайбы с саморезами','', '≈ '+Math.ceil(d.lathCount*roofLen/0.4)+' шт');
     if(cols>1) line('Соединительный профиль','', (cols-1)+' шт', f1((cols-1)*d.dev));
@@ -972,8 +1039,8 @@ function renderCut(){
     const info=G.info, c=roofCut;
     h+=`<section class="cutsec"><h3>Кровля: ${info.name.toLowerCase()}</h3><p class="sub">Купить: ${c.sheetsTxt}.</p>`+
        `<table><tr><th>Полоса</th><th class="n">Ширина, мм</th><th class="n">Длина, мм</th><th class="n">Кол-во</th></tr>`+
-       (c.cols>1?`<tr><td>Целая</td><td class="n">${nfmt(MM(info.sheetW))}</td><td class="n">${nfmt(MM(G.dev))}</td><td class="n">${c.cols-1} шт</td></tr>`:'')+
-       `<tr><td>${c.cols>1?'Крайняя':'Одна'}</td><td class="n">${nfmt(MM(Math.min(info.sheetW,c.lastW)))}</td><td class="n">${nfmt(MM(G.dev))}</td><td class="n">1 шт</td></tr></table>`+
+       c.lens.map(x=>(c.cols>1?`<tr><td>Целая</td><td class="n">${nfmt(MM(info.sheetW))}</td><td class="n">${nfmt(x.mm)}</td><td class="n">${(c.cols-1)*x.n} шт</td></tr>`:'')+
+       `<tr><td>${c.cols>1?'Крайняя':'Одна'}</td><td class="n">${nfmt(MM(Math.min(info.sheetW,c.lastW)))}</td><td class="n">${nfmt(x.mm)}</td><td class="n">${x.n} шт</td></tr>`).join('')+`</table>`+
        `<p class="sub">Длина полосы идёт по скату, ширина вдоль навеса.${info.opaque?' Для профнастила добавьте нахлёст листов на одну волну.':''}</p></section>`;
   }
   $('tabCut').innerHTML=h;
@@ -1016,8 +1083,8 @@ function chain(S, pts, yFrom, off, vertical){
 function drawTrussOn(S, dy){
   const T=G.T, ch=sec(P.chordSec), wb=sec(P.webSec);
   G.TP.forEach(p=>{ if(p.a) S.tube([[p.a[0],p.a[1]-dy],[p.b[0],p.b[1]-dy]], wb.a); });
-  S.tube(T.fine.map(x=>[x,T.bot(x)-dy]), ch.a);
-  S.tube(T.fine.map(x=>[x,T.top(x)-dy]), ch.a);
+  S.tube(T.botPts.map(p=>[p[0],p[1]-dy]), ch.a);
+  T.tops.forEach(pts=>S.tube(pts.map(p=>[p[0],p[1]-dy]), ch.a));
 }
 function renderDraw(){
   const T=G.T, W=G.W, L=G.L, H=G.H, yb=T.yb;
@@ -1025,7 +1092,7 @@ function renderDraw(){
   let h=`<p class="lead">Чертежи строятся по текущим настройкам. Размеры в миллиметрах, по осям труб. Перед резкой сверьте их с ведомостью на вкладке «Раскрой труб».</p>`;
 
   // 1. ферма
-  { const top=x=>T.top(x)-yb, bot=x=>T.bot(x)-yb, ymax=Math.max(...T.fine.map(top));
+  { const top=x=>T.top(x)-yb, bot=x=>T.bot(x)-yb, allTop=[].concat(...T.tops), pk=allTop.reduce((a,b)=>b[1]>a[1]?b:a), ymax=pk[1]-yb;
     const S=Sheet(`Ферма Ф1, ${G.nF} шт`, 0,0,W,ymax, 280);
     drawTrussOn(S, yb);
     const fs=Math.max(8.5,Math.min(13,W/T.N*S.sc*0.26));
@@ -1033,32 +1100,31 @@ function renderDraw(){
       if(p.a){ const mx=(p.a[0]+p.b[0])/2, my=(p.a[1]+p.b[1])/2-yb;
         if(p.kind==='С') S.text(mx,my,p.mark,{dx:-5,dy:fs*.35,fs,cls:'mk',anchor:'end'});
         else S.text(mx,my,p.mark,{dx:6,dy:-3,fs,cls:'mk',anchor:'start'}); }
-      else{ const mx=p.xa+(p.xb-p.xa)*(p.kind==='В'?0.3:0.5);
-        if(p.kind==='В') S.text(mx,top(mx),p.mark,{dy:-12,cls:'mk',fs:13});
-        else S.text(mx,bot(mx),p.mark,{dy:20,cls:'mk',fs:13}); }
+      else{ const t=p.kind==='В'?0.35:0.5, n=p.pts.length-1;
+        const q = n>1 ? p.pts[Math.round(n*t)] : [p.pts[0][0]+(p.pts[1][0]-p.pts[0][0])*t, p.pts[0][1]+(p.pts[1][1]-p.pts[0][1])*t];
+        S.text(q[0],q[1]-yb,p.mark,{dy:p.kind==='В'?-12:20,cls:'mk',fs:13}); }
     });
     chain(S, T.xs, 0, 36);
     S.dimH(0,W,0,66,nfmt(MM(W)));
     if(top(0)-bot(0)>0.02) S.dimV(bot(0),top(0),0,-30,nfmt(MM(top(0)-bot(0))));
-    const xpk = P.roofType==='single' ? W : W/2;
-    if(xpk<W) S.line(xpk,ymax,W,ymax,'ax');
+    if(pk[0]<W-1e-6) S.line(pk[0],ymax,W,ymax,'ax');
     S.dimV(0,ymax,W,40,nfmt(MM(ymax)));
     const rowsT=[]; const seen=new Set();
     const ko='ВНСР';
     [...G.TP].sort((p,q)=>ko.indexOf(p.kind)-ko.indexOf(q.kind)||parseInt(p.mark.slice(1))-parseInt(q.mark.slice(1))).forEach(p=>{ if(seen.has(p.mark)) return; seen.add(p.mark); const q=G.TP.filter(x=>x.mark===p.mark).length;
       rowsT.push(`<tr><td><b>${p.mark}</b></td><td>${p.name}</td><td>${secName(p.s)}</td><td class="n">${nfmt(p.mm)}</td><td class="n">${q}</td><td class="n">${q*G.nF}</td></tr>`); });
     h+=S.html(`<table><tr><th>Марка</th><th>Деталь</th><th>Сечение, мм</th><th class="n">Длина, мм</th><th class="n">На ферму</th><th class="n">Всего</th></tr>${rowsT.join('')}</table>`+
-      `<p class="note">${P.roofType==='arch'?`Пояса гнутся по дуге, радиус по оси верхнего пояса около ${nfmt(MM(T.radius+P.farmDepth))} мм. `:''}Длины стоек и раскосов даны между поясами. Торцы раскосов подрезаются под угол по месту.</p>`);
+      `<p class="note">${P.roofType==='split'?`Верхний скат заходит над нижним на ${nfmt(MM(P.ridgeOver))} мм, перепад в коньке ${nfmt(MM(P.ridgeDrop))} мм. Между скатами остаётся щель для света и воздуха. `:''}${P.roofType==='arch'?`Пояса гнутся по дуге, радиус по оси верхнего пояса около ${nfmt(MM(T.radius+P.farmDepth))} мм. `:''}Длины стоек и раскосов даны между поясами. Торцы раскосов подрезаются под угол по месту.</p>`);
   }
   // 2. поперечный разрез
-  { const rx=G.rp.map(p=>p[0]), x0=Math.min(...rx,-pil.a), x1=Math.max(...rx,W+pil.a)+(G.wall?0.45:0), y0=-G.below, y1=G.ridge;
+  { const rx=G.rpAll.map(p=>p[0]), x0=Math.min(...rx,-pil.a), x1=Math.max(...rx,W+pil.a)+(G.wall?0.45:0), y0=-G.below, y1=G.ridge;
     const S=Sheet('Поперечный разрез', x0,y0,x1,y1, 400);
     S.line(x0-0.25,0,x1+0.25,0,'gr');
     if(G.wall) S.rect(W+bm.b/2,0,W+bm.b/2+0.4,y1,'wl');
     G.sides.forEach(x=>{ if(G.below) S.rect(x-0.15,-G.below,x+0.15,0,'cn'); S.tube([[x,-G.below],[x,G.pillarTop]],pil.a); });
     [0,W].forEach(x=>S.rect(x-bm.b/2,H-bm.a,x+bm.b/2,H,'bs'));
     drawTrussOn(S, 0);
-    S.poly(G.rp,'rf');
+    G.rps.forEach(rp=>S.poly(rp,'rf'));
     S.dimH(0,W,y0,40,nfmt(MM(W)));
     S.dimH(Math.min(...rx),Math.max(...rx),y1,-24,nfmt(MM(Math.max(...rx)-Math.min(...rx))));
     S.dimV(0,H,x0,-34,nfmt(MM(H)));
@@ -1080,7 +1146,7 @@ function renderDraw(){
     h+=S.html(`<p class="note">Снизу: шаг столбов. Сверху: шаг ферм${folded?' (количество × шаг)':''}. Столбов в ряду: ${G.zs.length}.</p>`);
   }
   // 4. план
-  { const rx=G.rp.map(p=>p[0]), xa=Math.min(...rx,-pil.a), xb=Math.max(...rx,W+pil.a);
+  { const rx=G.rpAll.map(p=>p[0]), xa=Math.min(...rx,-pil.a), xb=Math.max(...rx,W+pil.a);
     const S=Sheet('План каркаса', G.z0,xa,G.z1,xb, 380);
     S.rect(G.z0,Math.min(...rx),G.z1,Math.max(...rx),'ds');
     G.lathX.forEach(x=>S.line(G.z0,x,G.z1,x,'lt'));
@@ -1137,6 +1203,7 @@ function loop(){
 }
 window.__calc={get P(){return P;}, set(p){ P=sanitize(Object.assign({},DEFAULTS,p)); syncUI(); rebuild(); }, info:()=>renderer.info, setTab, get parts(){return parts;}, get nests(){return nests;}};
 syncUI(); resize(); rebuild(); save(); loop();
+setTimeout(loadModels, 60);
 new ResizeObserver(resize).observe(view);
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>schedule()); // подписи размеров — уже нужным шрифтом
 })();
