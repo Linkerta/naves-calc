@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калькулятор навеса 3D</title>
+<style>
+  :root{--bg:#f4f5f7;--panel:#fff;--ink:#1d2330;--muted:#6b7385;--line:#e3e6ec;--acc:#2f6fed;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  #app{display:grid;grid-template-columns:350px 1fr;height:100vh}
+  #side{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 16px 40px}
+  h1{font-size:18px;margin:2px 0 12px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px;border-top:1px solid var(--line);padding-top:12px}
+  .row{display:grid;grid-template-columns:1fr 130px;align-items:center;gap:8px;margin:6px 0}
+  .row label{color:#38404f}
+  .row.hidden{display:none}
+  input[type=number],select{width:100%;padding:5px 7px;border:1px solid #cfd4dd;border-radius:6px;font:inherit;background:#fff}
+  .chk{display:flex;gap:8px;align-items:center;margin:6px 0}
+  .swatches{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}
+  .sw{width:26px;height:26px;border-radius:6px;border:2px solid #fff;outline:1px solid #cfd4dd;cursor:pointer}
+  .sw.on{outline:2px solid var(--acc)}
+  #main{position:relative;display:flex;flex-direction:column;min-width:0}
+  #main{height:100vh}
+  #view{flex:1 1 0;min-height:300px;position:relative;overflow:hidden}
+  #view canvas{display:block;position:absolute;inset:0}
+  #toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2}
+  button{border:1px solid #cfd4dd;background:#fff;border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  #summary{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;padding:8px 12px;z-index:2;font-size:13px}
+  #summary b{font-size:15px}
+  #specWrap{height:38%;min-height:160px;overflow:auto;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}
+  td.n,th.n{text-align:right}
+  tr.tot td{font-weight:700}
+  .warn{color:#b45309;font-size:12px;margin-top:6px}
+  @media (max-width:800px){#app{grid-template-columns:1fr;height:auto}#main{height:auto}#view{height:60vh;flex:none}}
+  @media print{#side,#toolbar{display:none}#app{display:block}#view{height:50vh}#specWrap{height:auto;overflow:visible}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>Калькулятор навеса из профильной трубы</h1>
+
+    <h2>Размеры</h2>
+    <div class="row"><label>Ширина (вынос), м</label><input type="number" id="width" min="2" max="12" step="0.1"></div>
+    <div class="row"><label>Длина, м</label><input type="number" id="length" min="2" max="30" step="0.1"></div>
+    <div class="row"><label>Высота до низа фермы, м</label><input type="number" id="height" min="1.8" max="5" step="0.05"></div>
+    <div class="row"><label>Высота подъёма крыши, м</label><input type="number" id="rise" min="0.2" max="3" step="0.05"></div>
+
+    <h2>Крыша и фермы</h2>
+    <div class="row"><label>Тип крыши</label>
+      <select id="roofType">
+        <option value="single">Односкатная</option>
+        <option value="gable">Двускатная</option>
+        <option value="arch">Арочная</option>
+      </select></div>
+    <div class="row" id="rowFarmDepth"><label>Высота арочной фермы, м</label><input type="number" id="farmDepth" min="0.1" max="0.6" step="0.01"></div>
+    <div class="row"><label>Шаг ферм, м</label><input type="number" id="farmStep" min="0.5" max="2" step="0.05"></div>
+    <div class="row"><label>Шаг обрешётки, м</label><input type="number" id="lathStep" min="0.3" max="1.2" step="0.05"></div>
+    <div class="row"><label>Свес по скату, м</label><input type="number" id="ovx" min="0" max="0.8" step="0.05"></div>
+    <div class="row"><label>Свес по торцам, м</label><input type="number" id="ovz" min="0" max="0.6" step="0.05"></div>
+
+    <h2>Столбы и установка</h2>
+    <div class="row"><label>Шаг столбов, м</label><input type="number" id="pillarStep" min="1" max="4" step="0.1"></div>
+    <div class="row"><label>Установка</label>
+      <select id="install">
+        <option value="base">На бетонное основание (анкеры)</option>
+        <option value="concrete">Бетонирование столбов</option>
+      </select></div>
+    <div class="row" id="rowDepth"><label>Глубина бетонирования, м</label><input type="number" id="concreteDepth" min="0.5" max="1.8" step="0.05"></div>
+    <label class="chk" id="rowWall"><input type="checkbox" id="wall"> Пристенный (высокая сторона крепится к стене)</label>
+
+    <h2>Профильная труба, мм</h2>
+    <div class="row"><label>Столбы</label><select id="pillarSec" class="pipe"></select></div>
+    <div class="row"><label>Продольные балки</label><select id="beamSec" class="pipe"></select></div>
+    <div class="row"><label>Пояса ферм</label><select id="chordSec" class="pipe"></select></div>
+    <div class="row"><label>Раскосы ферм</label><select id="webSec" class="pipe"></select></div>
+    <div class="row"><label>Обрешётка</label><select id="lathSec" class="pipe"></select></div>
+
+    <h2>Кровля и цвет</h2>
+    <div class="row"><label>Материал кровли</label>
+      <select id="roofMat">
+        <option value="pc10">Сотовый поликарбонат 10 мм</option>
+        <option value="pc8">Сотовый поликарбонат 8 мм</option>
+        <option value="mono">Монолитный поликарбонат 4 мм</option>
+        <option value="prof">Профнастил С-20</option>
+        <option value="tile">Металлочерепица</option>
+      </select></div>
+    <div class="row"><label>Цвет кровли</label><span id="roofColorName"></span><div class="swatches" id="roofColors"></div></div>
+    <div class="row"><label>Цвет каркаса</label><span id="frameColorName"></span><div class="swatches" id="frameColors"></div></div>
+    <div id="warn" class="warn"></div>
+
+    <h2>Отображение</h2>
+    <label class="chk"><input type="checkbox" id="showRoof" checked> Показывать кровлю</label>
+    <label class="chk"><input type="checkbox" id="showDims" checked> Показывать размеры</label>
+    <label class="chk"><input type="checkbox" id="showPerson" checked> Человек для масштаба</label>
+    <p style="margin-top:16px"><button id="reset">Сбросить параметры</button></p>
+  </aside>
+
+  <section id="main">
+    <div id="view">
+      <div id="toolbar">
+        <button data-view="iso">3D</button>
+        <button data-view="front">Спереди</button>
+        <button data-view="side">Сбоку</button>
+        <button data-view="top">Сверху</button>
+        <button id="shot">Скачать картинку</button>
+        <button id="print">Печать</button>
+      </div>
+      <div id="summary"></div>
+    </div>
+    <div id="specWrap"><table id="spec"></table></div>
+  </section>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script>
+(function(){
+'use strict';
+// ---------- справочники ----------
+const PIPES = ['40x20x1.5','40x40x2','60x40x2','60x60x2','80x40x2','80x80x3','100x100x3','120x120x4'];
+const DEFAULTS = {
+  width:4.5, length:6, height:2.5, rise:0.8, roofType:'single', farmDepth:0.25,
+  farmStep:1.0, lathStep:0.6, ovx:0.2, ovz:0.15, pillarStep:2.5, install:'base', concreteDepth:1.0, wall:false,
+  pillarSec:'80x80x3', beamSec:'80x40x2', chordSec:'40x40x2', webSec:'40x20x1.5', lathSec:'40x20x1.5',
+  roofMat:'pc10', roofColor:'Прозрачный', frameColor:'Чёрный RAL 9005'
+};
+const PC_COLORS = {'Прозрачный':['#cfe6ff',.45],'Бронза':['#8c6b3f',.6],'Янтарь':['#e8a33c',.6],'Синий':['#3a7bd5',.55],
+  'Зелёный':['#3fa34d',.55],'Бирюза':['#2bb3b1',.55],'Красный':['#c0392b',.6],'Молочный':['#f2f1ea',.85]};
+const MONO_COLORS = {'Прозрачный':['#e6f3ff',.25],'Бронза':['#8c6b3f',.5],'Серый':['#8a8f96',.5]};
+const RAL = {'Чёрный RAL 9005':'#1f1f20','Коричневый RAL 8017':'#45322e','Графит RAL 7024':'#474a51','Белый RAL 9003':'#ececec',
+  'Зелёный RAL 6005':'#114232','Вишня RAL 3005':'#5e2129','Синий RAL 5005':'#1e3f7a','Серый (грунт)':'#8a8d8f'};
+const ROOF_INFO = {
+  pc10:{name:'Сотовый поликарбонат 10 мм', colors:PC_COLORS, sheetW:2.1, sheetL:[6,12], kgm2:1.1},
+  pc8:{name:'Сотовый поликарбонат 8 мм', colors:PC_COLORS, sheetW:2.1, sheetL:[6,12], kgm2:0.9},
+  mono:{name:'Монолитный поликарбонат 4 мм', colors:MONO_COLORS, sheetW:2.05, sheetL:[3.05], kgm2:4.8},
+  prof:{name:'Профнастил С-20', colors:RAL, sheetW:1.10, sheetL:null, kgm2:4.4, opaque:true},
+  tile:{name:'Металлочерепица', colors:RAL, sheetW:1.10, sheetL:null, kgm2:4.6, opaque:true}
+};
+const STEEL = 7850;
+function sec(s){const [a,b,t]=s.split('x').map(Number);return {a:a/1000,b:b/1000,t:t/1000,
+  kgm:(a*b-(a-2*t)*(b-2*t))*1e-6*STEEL, perim:2*(a+b)/1000};}
+
+// ---------- состояние ----------
+let P = load();
+function load(){
+  let p = Object.assign({}, DEFAULTS);
+  try{ Object.assign(p, JSON.parse(localStorage.getItem('navesCalc')||'{}')); }catch(e){}
+  try{ if(location.hash.length>1) Object.assign(p, JSON.parse(decodeURIComponent(location.hash.slice(1)))); }catch(e){}
+  return p;
+}
+function save(){ try{ localStorage.setItem('navesCalc', JSON.stringify(P)); }catch(e){} }
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+document.querySelectorAll('select.pipe').forEach(s=>{
+  PIPES.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p.replace(/x/g,' × ');s.appendChild(o);});
+});
+const fields = ['width','length','height','rise','roofType','farmDepth','farmStep','lathStep','ovx','ovz','pillarStep',
+  'install','concreteDepth','pillarSec','beamSec','chordSec','webSec','lathSec','roofMat'];
+function syncUI(){
+  fields.forEach(f=>{ $(f).value = P[f]; });
+  $('wall').checked = !!P.wall;
+  buildSwatches();
+  $('rowFarmDepth').classList.toggle('hidden', P.roofType!=='arch');
+  $('rowDepth').classList.toggle('hidden', P.install!=='concrete');
+  $('rowWall').style.display = P.roofType==='single' ? 'flex' : 'none';
+}
+function buildSwatches(){
+  const info = ROOF_INFO[P.roofMat];
+  if(!(P.roofColor in info.colors)) P.roofColor = Object.keys(info.colors)[0];
+  if(!(P.frameColor in RAL)) P.frameColor = DEFAULTS.frameColor;
+  fillSw($('roofColors'), info.colors, P.roofColor, k=>{P.roofColor=k;changed();});
+  fillSw($('frameColors'), RAL, P.frameColor, k=>{P.frameColor=k;changed();});
+  $('roofColorName').textContent = P.roofColor;
+  $('frameColorName').textContent = P.frameColor;
+}
+function fillSw(el, map, cur, cb){
+  el.innerHTML='';
+  Object.keys(map).forEach(k=>{
+    const d=document.createElement('div'); d.className='sw'+(k===cur?' on':''); d.title=k;
+    const v=map[k]; d.style.background = Array.isArray(v)?v[0]:v;
+    d.onclick=()=>cb(k); el.appendChild(d);
+  });
+}
+fields.forEach(f=>{
+  $(f).addEventListener('input', ()=>{
+    const el=$(f); let v = el.type==='number' ? parseFloat(el.value) : el.value;
+    if(el.type==='number'){ if(isNaN(v)) return; v=Math.min(+el.max,Math.max(+el.min,v)); }
+    P[f]=v; changed(f==='roofMat'||f==='roofType'||f==='install');
+  });
+  if($(f).type==='number') $(f).addEventListener('change', ()=>{ $(f).value=P[f]; });
+});
+$('wall').addEventListener('change',()=>{P.wall=$('wall').checked;changed();});
+['showRoof','showDims','showPerson'].forEach(id=>$(id).addEventListener('change',()=>changed()));
+$('reset').onclick=()=>{P=Object.assign({},DEFAULTS);history.replaceState(null,'',location.pathname);syncUI();changed();fitView('iso');};
+
+let pending=false;
+function changed(resync){
+  if(resync) syncUI(); else buildSwatches();
+  save();
+  history.replaceState(null,'','#'+encodeURIComponent(JSON.stringify(P)));
+  if(!pending){pending=true;requestAnimationFrame(()=>{pending=false;rebuild();});}
+}
+
+// ---------- three.js сцена ----------
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#dfe8f1');
+scene.fog = new THREE.Fog('#dfe8f1', 40, 120);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI*0.495;
+
+scene.add(new THREE.HemisphereLight('#ffffff','#8c9a7a',0.75));
+const sun = new THREE.DirectionalLight('#ffffff',0.85);
+sun.position.set(12,20,16); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-25,right:25,top:25,bottom:-25,near:1,far:80});
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(300,300), new THREE.MeshStandardMaterial({color:'#9fb08a',roughness:1}));
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+
+let model = new THREE.Group(); scene.add(model);
+
+function resize(){
+  const w=view.clientWidth, h=view.clientHeight;
+  if(!w||!h) return;
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// ---------- построение ----------
+const X = new THREE.Vector3(1,0,0);
+let spec, matCache={};
+function mat(color, opts){
+  const k=color+JSON.stringify(opts||{});
+  if(!matCache[k]) matCache[k]=new THREE.MeshStandardMaterial(Object.assign({color, roughness:.55, metalness:.25}, opts||{}));
+  return matCache[k];
+}
+function addSpec(role, s, len){
+  const k=role+'|'+s; spec[k]=spec[k]||{role, s, len:0, n:0};
+  spec[k].len+=len; spec[k].n+=1;
+}
+// стержень из профтрубы между точками; сторона a — «вверх», b — поперёк
+function member(p1, p2, s, color, role, specLen){
+  const S=sec(s), d=new THREE.Vector3().subVectors(p2,p1), len=d.length();
+  if(len<1e-4) return;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(len, S.a, S.b), mat(color));
+  m.position.copy(p1).add(p2).multiplyScalar(.5);
+  m.quaternion.setFromUnitVectors(X, d.normalize());
+  m.castShadow=true; m.receiveShadow=true; model.add(m);
+  if(role) addSpec(role, s, specLen!==undefined?specLen:len);
+}
+const v3=(x,y,z)=>new THREE.Vector3(x,y,z);
+const linspace=(a,b,n)=>Array.from({length:n},(_,i)=>n===1?a:a+(b-a)*i/(n-1));
+
+function trussProfile(){
+  const W=P.width, S=P.rise, ch=sec(P.chordSec), yb=P.height+ch.a/2;
+  const h0=Math.min(0.15,S*0.5);
+  let N=Math.max(4,Math.round(W/0.6)); if(N%2) N++;
+  const xs=linspace(0,W,N+1);
+  let top, bot;
+  if(P.roofType==='single'){
+    top=x=>yb+h0+(S-h0)*x/W; bot=()=>yb;
+  }else if(P.roofType==='gable'){
+    top=x=>yb+h0+(S-h0)*(1-Math.abs(2*x/W-1)); bot=()=>yb;
+  }else{
+    const R=(W*W/4+S*S)/(2*S), cy=S-R;
+    const f=x=>cy+Math.sqrt(Math.max(0,R*R-(x-W/2)**2));
+    top=x=>yb+P.farmDepth+f(x); bot=x=>yb+f(x);
+  }
+  const fine = P.roofType==='arch' ? linspace(0,W,Math.max(24,N*3)+1) : (P.roofType==='gable'?[0,W/2,W]:[0,W]);
+  return {xs, N, top, bot, fine, yb};
+}
+
+function rebuild(){
+  scene.remove(model);
+  model.traverse(o=>{ if(o.geometry) o.geometry.dispose(); });
+  model=new THREE.Group(); scene.add(model);
+  spec={};
+  const W=P.width, L=P.length, H=P.height;
+  const frameC=RAL[P.frameColor];
+  const bm=sec(P.beamSec), ch=sec(P.chordSec), lt=sec(P.lathSec);
+  const wall = P.wall && P.roofType==='single';
+
+  // столбы
+  const nP=Math.max(2, Math.ceil(L/P.pillarStep-1e-9)+1);
+  const zs=linspace(0,L,nP);
+  const sides = wall ? [0] : [0,W];
+  const pillarTop = H - bm.a;
+  const below = P.install==='concrete' ? P.concreteDepth : 0;
+  sides.forEach(x=>zs.forEach(z=>{
+    member(v3(x,0,z), v3(x,pillarTop,z), P.pillarSec, frameC, 'Столбы', pillarTop+below);
+    if(P.install==='base'){
+      const pl=new THREE.Mesh(new THREE.BoxGeometry(.2,.01,.2), mat('#555'));
+      pl.position.set(x,.005,z); model.add(pl);
+    }else{
+      const c=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.03,20), mat('#b9b9b4',{metalness:0}));
+      c.position.set(x,.015,z); c.receiveShadow=true; model.add(c);
+    }
+  }));
+  if(P.install==='base'){
+    const sw = W + (wall?0.3:0.6);
+    const slab=new THREE.Mesh(new THREE.BoxGeometry(sw,.08,L+.6), mat('#c4c2bc',{metalness:0,roughness:.95}));
+    slab.position.set(wall?(W-0.3)/2:W/2,-.035,L/2); slab.receiveShadow=true; model.add(slab);
+  }
+  // продольные балки
+  [0,W].forEach(x=>member(v3(x,H-bm.a/2,0), v3(x,H-bm.a/2,L), P.beamSec, frameC, wall&&x===W?'Пристенная балка':'Продольные балки'));
+  if(wall){
+    const wh=H+P.rise+1.2;
+    const wm=new THREE.Mesh(new THREE.BoxGeometry(.4, wh, L+3), mat('#d9cfc0',{metalness:0,roughness:.9}));
+    wm.position.set(W+bm.b/2+.2,wh/2,L/2); wm.receiveShadow=true; wm.castShadow=true; model.add(wm);
+  }
+
+  // фермы
+  const T=trussProfile();
+  const nF=Math.max(2, Math.ceil(L/P.farmStep-1e-9)+1);
+  const fz=linspace(0,L,nF);
+  fz.forEach(z=>{
+    for(let i=0;i<T.fine.length-1;i++){
+      const a=T.fine[i], b=T.fine[i+1];
+      member(v3(a,T.top(a),z), v3(b,T.top(b),z), P.chordSec, frameC, 'Верхний пояс ферм');
+      member(v3(a,T.bot(a),z), v3(b,T.bot(b),z), P.chordSec, frameC, 'Нижний пояс ферм');
+    }
+    const half=T.N/2;
+    for(let i=0;i<=T.N;i++){
+      const x=T.xs[i], h=T.top(x)-T.bot(x);
+      if(h>ch.a*1.2) member(v3(x,T.bot(x)+ch.a/2,z), v3(x,T.top(x)-ch.a/2,z), P.webSec, frameC, 'Раскосы и стойки');
+      if(i<T.N){
+        const x2=T.xs[i+1];
+        let p,q;
+        const forward = P.roofType==='single' ? true : i<half;
+        if(forward){ p=v3(x,T.bot(x),z); q=v3(x2,T.top(x2),z); }
+        else { p=v3(x,T.top(x),z); q=v3(x2,T.bot(x2),z); }
+        member(p,q,P.webSec,frameC,'Раскосы и стойки',p.distanceTo(q)-ch.a);
+      }
+    }
+  });
+
+  // профиль кровли (с вылетом по скату), смещённый по нормали
+  const base=T.fine.map(x=>[x,T.top(x)]);
+  function ext(pA,pB,len){const dx=pA[0]-pB[0],dy=pA[1]-pB[1],l=Math.hypot(dx,dy);return [pA[0]+dx/l*len,pA[1]+dy/l*len];}
+  const prof=[ext(base[0],base[1],P.ovx), ...base, ext(base[base.length-1],base[base.length-2],P.ovx)];
+  if(wall) prof.pop(); // у стены свеса нет
+  function offsetProfile(pts,off){
+    return pts.map((p,i)=>{
+      const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
+      let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
+      return [p[0]-ty*off, p[1]+tx*off];
+    });
+  }
+  // обрешётка
+  const lathPts=[]; {
+    let acc=0, next=0; const step=P.lathStep;
+    for(let i=0;i<base.length-1;i++){
+      const a=base[i], b=base[i+1], sl=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      while(next<=acc+sl+1e-6){ const t=(next-acc)/sl; lathPts.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, i]); next+=step; }
+      acc+=sl;
+    }
+    const last=base[base.length-1], lp=lathPts[lathPts.length-1];
+    if(Math.hypot(last[0]-lp[0],last[1]-lp[1])>step*0.3) lathPts.push([last[0],last[1],base.length-2]);
+  }
+  lathPts.forEach(([x,y,i])=>{
+    const a=base[i], b=base[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty); tx/=l; ty/=l;
+    const off=ch.a/2+lt.a/2, px=x-ty*off, py=y+tx*off;
+    member(v3(px,py,-P.ovz), v3(px,py,L+P.ovz), P.lathSec, frameC, 'Обрешётка');
+  });
+  // кровля
+  const rp=offsetProfile(prof, ch.a/2+lt.a+0.006);
+  let dev=0; for(let i=0;i<rp.length-1;i++) dev+=Math.hypot(rp[i+1][0]-rp[i][0],rp[i+1][1]-rp[i][1]);
+  const info=ROOF_INFO[P.roofMat], cval=info.colors[P.roofColor];
+  const roofColor=Array.isArray(cval)?cval[0]:cval, opacity=Array.isArray(cval)?cval[1]:1;
+  const z0=-P.ovz, z1=L+P.ovz;
+  const pos=[], idx=[];
+  rp.forEach(([x,y])=>{pos.push(x,y,z0, x,y,z1);});
+  for(let i=0;i<rp.length-1;i++){const k=i*2; idx.push(k,k+1,k+2, k+1,k+3,k+2);}
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
+  const roofMesh=new THREE.Mesh(g, info.opaque
+      ? new THREE.MeshStandardMaterial({color:roofColor,side:THREE.DoubleSide,roughness:.5,metalness:.35})
+      : new THREE.MeshStandardMaterial({color:roofColor,side:THREE.DoubleSide,transparent:true,opacity,roughness:.25,metalness:0,depthWrite:false}));
+  roofMesh.castShadow=true; roofMesh.receiveShadow=!!info.opaque;
+  const showRoof=$('showRoof').checked;
+  roofMesh.visible=showRoof; model.add(roofMesh);
+  // стыки листов / волны профнастила
+  const roofLines=new THREE.Group(); roofLines.visible=showRoof; model.add(roofLines);
+  const jointStep = info.opaque ? 0.2 : info.sheetW;
+  const lineMat=new THREE.LineBasicMaterial({color: info.opaque? new THREE.Color(roofColor).multiplyScalar(.6) : '#7a8796'});
+  for(let z=z0; z<=z1+1e-6; z+=jointStep){
+    roofLines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp.map(([x,y])=>v3(x,y+0.003,z))), lineMat));
+  }
+  [z0,z1].forEach(z=>roofLines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp.map(([x,y])=>v3(x,y,z))), new THREE.LineBasicMaterial({color:'#555'}))));
+
+  // человек для масштаба (≈1,75 м)
+  if($('showPerson').checked){
+    const pm=mat('#3b4a63',{metalness:0,roughness:.8}), sk=mat('#e0b896',{metalness:0,roughness:.8});
+    const pg=new THREE.Group();
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(.17,.15,.62,16),pm); body.position.y=1.17;
+    const legs=new THREE.Mesh(new THREE.CylinderGeometry(.14,.12,.86,16),mat('#2a2f38',{metalness:0})); legs.position.y=.43;
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.12,16,12),sk); head.position.y=1.63;
+    [body,legs,head].forEach(m=>{m.castShadow=true;pg.add(m);});
+    pg.position.set(Math.min(W*0.35,1.4),0,L+0.9); model.add(pg);
+  }
+
+  // размеры
+  const ridge = Math.max(...rp.map(p=>p[1]));
+  if($('showDims').checked){
+    dim(v3(0,.02,L+.7), v3(W,.02,L+.7), fmt(W)+' м', v3(0,0,1));
+    dim(v3(-.7,.02,0), v3(-.7,.02,L), fmt(L)+' м', v3(-1,0,0));
+    dim(v3(-.5,0,L+.5), v3(-.5,H,L+.5), fmt(H)+' м', v3(-1,0,0));
+    const xr=W+.5+(wall?.5:0);
+    dim(v3(xr,0,L+.5), v3(xr,ridge,L+.5), fmt(ridge)+' м', v3(1,0,0));
+  }
+
+  report({W,L,nP:nP*sides.length,nF,dev,ridge,info,z0,z1,lathCount:lathPts.length});
+  if(!fitted){fitView('iso');fitted=true;}
+}
+let fitted=false;
+const fmt=v=>(+v).toFixed(2).replace(/\.?0+$/,'').replace('.',',');
+
+function label(text){
+  const c=document.createElement('canvas'), ctx=c.getContext('2d'), fs=56, font=`600 ${fs}px -apple-system,Segoe UI,Arial`;
+  ctx.font=font;
+  c.width=Math.ceil(ctx.measureText(text).width+28); c.height=fs+24;
+  ctx.font=font;
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#1d2330'; ctx.textBaseline='middle'; ctx.fillText(text,14,c.height/2+2);
+  const tex=new THREE.CanvasTexture(c); tex.encoding=THREE.sRGBEncoding;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));
+  const h=0.32; s.scale.set(h*c.width/c.height,h,1); s.renderOrder=10;
+  return s;
+}
+function dim(a,b,text,outward){
+  const m=new THREE.LineBasicMaterial({color:'#c0392b',depthTest:false});
+  const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),m); l.renderOrder=9; model.add(l);
+  const dir=new THREE.Vector3().subVectors(b,a).normalize();
+  let tick=new THREE.Vector3().crossVectors(dir,outward); if(tick.lengthSq()<1e-6) tick=outward.clone();
+  tick.normalize().multiplyScalar(.12);
+  [a,b].forEach(p=>{const t=new THREE.Line(new THREE.BufferGeometry().setFromPoints([p.clone().add(tick),p.clone().sub(tick)]),m);t.renderOrder=9;model.add(t);});
+  const s=label(text); s.position.copy(a).add(b).multiplyScalar(.5).add(outward.clone().multiplyScalar(.25)); model.add(s);
+}
+
+// ---------- спецификация ----------
+function report(d){
+  const rows=Object.values(spec);
+  const order=['Столбы','Продольные балки','Пристенная балка','Верхний пояс ферм','Нижний пояс ферм','Раскосы и стойки','Обрешётка'];
+  const counted=['Столбы','Продольные балки','Пристенная балка','Обрешётка'];
+  rows.sort((a,b)=>order.indexOf(a.role)-order.indexOf(b.role));
+  let mass=0, paint=0, html='<tr><th>Позиция</th><th>Сечение, мм</th><th class="n">Кол-во</th><th class="n">Длина, м</th><th class="n">Масса, кг</th></tr>';
+  const bySec={};
+  rows.forEach(r=>{
+    const S=sec(r.s), kg=r.len*S.kgm; mass+=kg; paint+=r.len*S.perim;
+    bySec[r.s]=(bySec[r.s]||0)+r.len;
+    html+=`<tr><td>${r.role}</td><td>${r.s.replace(/x/g,' × ')}</td><td class="n">${counted.includes(r.role)?r.n+' шт':''}</td><td class="n">${r.len.toFixed(1)}</td><td class="n">${kg.toFixed(0)}</td></tr>`;
+  });
+  html+=`<tr class="tot"><td>Итого металл</td><td></td><td></td><td class="n">${rows.reduce((s,r)=>s+r.len,0).toFixed(1)}</td><td class="n">${mass.toFixed(0)}</td></tr>`;
+  html+='<tr><th colspan="5">Закупка трубы (хлысты по 6 м, +5% на обрезки)</th></tr>';
+  Object.keys(bySec).sort((a,b)=>PIPES.indexOf(a)-PIPES.indexOf(b)).forEach(s=>{
+    const len=bySec[s]*1.05;
+    html+=`<tr><td>Профтруба</td><td>${s.replace(/x/g,' × ')}</td><td class="n">${Math.ceil(len/6)} шт</td><td class="n">${len.toFixed(1)}</td><td class="n">${(len*sec(s).kgm).toFixed(0)}</td></tr>`;
+  });
+  // кровля
+  const info=d.info, roofLen=d.z1-d.z0, area=d.dev*roofLen;
+  html+='<tr><th colspan="5">Кровля и прочее</th></tr>';
+  const cols=Math.ceil(roofLen/info.sheetW-1e-9);
+  let sheetsTxt;
+  if(info.sheetL){
+    let best=null;
+    info.sheetL.forEach(SL=>{
+      const n = d.dev<=SL ? Math.ceil(cols/Math.floor(SL/d.dev)) : cols*Math.ceil(d.dev/SL);
+      const waste=n*SL*info.sheetW-area;
+      if(!best||waste<best.waste) best={SL,n,waste};
+    });
+    sheetsTxt=`${best.n} листов ${fmt(info.sheetW)}×${best.SL} м`;
+  }else{
+    sheetsTxt=`${cols} листов по ${fmt(d.dev)} м (шир. ${fmt(info.sheetW)} м)`;
+  }
+  html+=`<tr><td>${info.name}, ${P.roofColor.toLowerCase()}</td><td colspan="2">${sheetsTxt}</td><td class="n">${area.toFixed(1)} м²</td><td class="n">${(area*info.kgm2).toFixed(0)}</td></tr>`;
+  if(!info.opaque){
+    html+=`<tr><td>Термошайбы с саморезами</td><td></td><td class="n">≈ ${Math.ceil(d.lathCount*roofLen/0.4)} шт</td><td></td><td></td></tr>`;
+    html+=`<tr><td>Соединительный профиль</td><td></td><td class="n">${Math.max(0,cols-1)} шт</td><td class="n">${(Math.max(0,cols-1)*d.dev).toFixed(1)}</td><td></td></tr>`;
+    html+=`<tr><td>Торцевой профиль / лента</td><td></td><td></td><td class="n">${(2*roofLen).toFixed(1)}</td><td></td></tr>`;
+  }else{
+    html+=`<tr><td>Кровельные саморезы</td><td></td><td class="n">≈ ${Math.ceil(area*7)} шт</td><td></td><td></td></tr>`;
+    if(P.roofType==='gable') html+=`<tr><td>Конёк (планки по 2 м)</td><td></td><td class="n">${Math.ceil(roofLen/1.9)} шт</td><td class="n">${roofLen.toFixed(1)}</td><td></td></tr>`;
+  }
+  if(P.install==='base'){
+    html+=`<tr><td>Опорные пластины 200×200 + анкеры</td><td></td><td class="n">${d.nP} / ${d.nP*4} шт</td><td></td><td></td></tr>`;
+  }else{
+    const vol=d.nP*Math.PI*0.15*0.15*P.concreteDepth;
+    html+=`<tr><td>Бетон М200 (скважины Ø300)</td><td></td><td class="n">${vol.toFixed(2)} м³</td><td></td><td></td></tr>`;
+  }
+  html+=`<tr><td>Площадь окраски каркаса</td><td></td><td class="n">${paint.toFixed(1)} м²</td><td></td><td></td></tr>`;
+  $('spec').innerHTML=html;
+  $('summary').innerHTML=`<b>${fmt(d.W)} × ${fmt(d.L)} м</b> · ${fmt(d.W*d.L)} м²<br>`+
+    `Столбов: ${d.nP} · ферм: ${d.nF}<br>Высота в коньке: ${fmt(d.ridge)} м<br>Металл: ${mass.toFixed(0)} кг`;
+  let w='';
+  if(P.roofType==='arch' && info.opaque) w='Профнастил и металлочерепица плохо гнутся: для арки обычно берут поликарбонат.';
+  else if(d.W>6 && P.chordSec==='40x40x2') w='Для пролёта больше 6 м пояса 40×40 тонковаты, лучше 60×40 или 60×60.';
+  else if(P.lathStep>0.8 && !info.opaque) w='Для поликарбоната шаг обрешётки обычно не больше 0,7–0,8 м.';
+  $('warn').textContent=w;
+}
+
+// ---------- камера ----------
+function fitView(kind){
+  const W=P.width, L=P.length, Hh=P.height+P.rise;
+  const c=v3(W/2,Hh/2,L/2), r=Math.max(W,L,Hh)*1.05+2;
+  const dirs={iso:v3(-0.9,0.6,1.1),front:v3(0,0.12,1),side:v3(-1,0.12,0),top:v3(0.001,1,0.001)};
+  const d=dirs[kind].normalize();
+  const dist=r/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*0.62;
+  camera.position.copy(c).add(d.multiplyScalar(dist));
+  controls.target.copy(c); controls.update();
+}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>fitView(b.dataset.view));
+$('shot').onclick=()=>{
+  renderer.render(scene,camera);
+  const a=document.createElement('a'); a.href=renderer.domElement.toDataURL('image/png');
+  a.download=`навес_${P.width}x${P.length}.png`; a.click();
+};
+$('print').onclick=()=>window.print();
+
+function loop(){ controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop); }
+syncUI(); resize(); rebuild(); loop();
+new ResizeObserver(resize).observe(view);
+})();
+</script>
+</body>
+</html>
